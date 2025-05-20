@@ -1,0 +1,221 @@
+{
+    "editor.tokenColorCustomizations": {
+        "textMateRules": [
+            {
+                "scope": "comment",
+                "settings": {
+                    "fontStyle": ""
+                }
+            },
+            {
+                "scope": "comment.line.double-slash",
+                "settings": {
+                    "fontStyle": ""
+                }
+            },
+            {
+                "name": "Back Pattern Comments",
+                "scope": "comment.line.double-slash.cpp",
+                "settings": {
+                    "foreground": "#4CAF50",
+                    "fontStyle": ""
+                }
+            },
+            {
+                "name": "Front Pattern Comments",
+                "scope": "comment.line.double-slash.cpp",
+                "settings": {
+                    "foreground": "#2196F3",
+                    "fontStyle": ""
+                }
+            },
+            {
+                "name": "Left Pattern Comments",
+                "scope": "comment.line.double-slash.cpp",
+                "settings": {
+                    "foreground": "#FFC107",
+                    "fontStyle": ""
+                }
+            },
+            {
+                "name": "Right Pattern Comments",
+                "scope": "comment.line.double-slash.cpp",
+                "settings": {
+                    "foreground": "#E91E63",
+                    "fontStyle": ""
+                }
+            }
+        ]
+    },
+    "better-comments.tags": [
+        {
+            "tag": "back:",
+            "color": "#4CAF50",
+            "strikethrough": false,
+            "backgroundColor": "transparent"
+        },
+        {
+            "tag": "front:",
+            "color": "#2196F3",
+            "strikethrough": false,
+            "backgroundColor": "transparent"
+        },
+        {
+            "tag": "left:",
+            "color": "#FFC107",
+            "strikethrough": false,
+            "backgroundColor": "transparent"
+        },
+        {
+            "tag": "right:",
+            "color": "#E91E63",
+            "strikethrough": false,
+            "backgroundColor": "transparent"
+        },
+        {
+            "tag": "!",
+            "color": "#FF2D00",
+            "strikethrough": false,
+            "backgroundColor": "transparent"
+        },
+        {
+            "tag": "?",
+            "color": "#3498DB",
+            "strikethrough": false,
+            "backgroundColor": "transparent"
+        },
+        {
+            "tag": "//",
+            "color": "#474747",
+            "strikethrough": true,
+            "backgroundColor": "transparent"
+        },
+        {
+            "tag": "todo",
+            "color": "#FF8C00",
+            "strikethrough": false,
+            "backgroundColor": "transparent"
+        },
+        {
+            "tag": "*",
+            "color": "#98C379",
+            "strikethrough": false,
+            "backgroundColor": "transparent"
+        }
+    ],
+    "workbench.colorCustomizations": {
+        "editor.lineHighlightBackground": "#1073CF2A",
+        "editor.lineHighlightBorder": "#9FAFBC4A",
+        "workbench.tree.indentGuidesStroke": "#4CAF50"
+    },
+    "workbench.iconTheme": "vs-seti",
+    "C_Cpp.enhancedColorization": "Enabled",
+    "folder-color.pathColors": [
+        {
+            "folderPath": "src/Commands/",
+            "color": "foldercolorizer.color_ff0000",
+            "badge": "📝"
+        },
+        {
+            "folderPath": "src/Functionality/",
+            "color": "foldercolorizer.color_00cc33",
+            "badge": "⚙️"
+        },
+        {
+            "folderPath": "src/Main/",
+            "color": "foldercolorizer.color_3399ff",
+            "badge": "🏠"
+        },
+        {
+            "folderPath": "src/Motors/",
+            "color": "foldercolorizer.color_ff00ff",
+            "badge": "🔄"
+        },
+        {
+            "folderPath": "src/Painting Sides/",
+            "color": "foldercolorizer.color_00ffff",
+            "badge": "🎨"
+        },
+        {
+            "folderPath": "src/persistence/",
+            "color": "foldercolorizer.color_9966ff",
+            "badge": "💾"
+        },
+        {
+            "folderPath": "src/settings/",
+            "color": "foldercolorizer.color_3399ff",
+            "badge": "⚙️"
+        },
+        {
+            "folderPath": "src/states/",
+            "color": "foldercolorizer.color_ffff00",
+            "badge": "🔍"
+        },
+        {
+            "folderPath": "include/hardware/",
+            "color": "foldercolorizer.color_ff4500",
+            "badge": "🔌"
+        },
+        {
+            "folderPath": "include/motors/",
+            "color": "foldercolorizer.color_ff00ff",
+            "badge": "⚡"
+        },
+        {
+            "folderPath": "include/persistence/",
+            "color": "foldercolorizer.color_9966ff",
+            "badge": "💾"
+        },
+        {
+            "folderPath": "include/settings/",
+            "color": "foldercolorizer.color_3399ff",
+            "badge": "⚙️"
+        },
+        {
+            "folderPath": "include/states/",
+            "color": "foldercolorizer.color_ffff00",
+            "badge": "🔄"
+        },
+        {
+            "folderPath": "include/utils/",
+            "color": "foldercolorizer.color_00ff00",
+            "badge": "🔧"
+        },
+        {
+            "folderPath": "include/web/",
+            "color": "foldercolorizer.color_00ffff",
+            "badge": "🌐"
+        },
+        {
+            "folderPath": "src/",
+            "color": "foldercolorizer.color_ff4500",
+            "badge": "📁"
+        },
+        {
+            "folderPath": "include/",
+            "color": "foldercolorizer.color_4169e1",
+            "badge": "📂"
+        },
+        {
+            "folderPath": "lib/",
+            "color": "foldercolorizer.color_9acd32",
+            "badge": "📚"
+        },
+        {
+            "folderPath": "test/",
+            "color": "foldercolorizer.color_ffa500",
+            "badge": "🧪"
+        },
+        {
+            "folderPath": ".pio/",
+            "color": "foldercolorizer.color_808080",
+            "badge": "🔧"
+        },
+        {
+            "folderPath": ".vscode/",
+            "color": "foldercolorizer.color_a9a9a9",
+            "badge": "⚙️"
+        }
+    ],
+    // Check the folder-color extension documentation or source code for supported colors.
+}
