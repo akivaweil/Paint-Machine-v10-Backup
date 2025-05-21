@@ -7,6 +7,7 @@
 #include "utils/settings.h"
 #include "system/machine_state.h"
 #include "motors/Rotation_Motor.h" // Include Rotation_Motor for rotationStepper access
+#include "settings/debounce_settings.h" // Added for centralized debounce intervals
 
 class Homing {
 public:
@@ -31,7 +32,6 @@ private:
     Bounce _yRightHomeSwitch;
     Bounce _zHomeSwitch;
 
-    const unsigned long HOMING_SWITCH_DEBOUNCE_MS = 3; // milliseconds
     bool _isHoming = false; // Internal homing state flag
 
     long inchesToStepsXYZ(float inches); // Keep utility function private or move elsewhere if shared

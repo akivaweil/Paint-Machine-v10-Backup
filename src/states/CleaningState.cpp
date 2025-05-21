@@ -38,8 +38,8 @@ const unsigned int CLEANING_Z_SPEED = 1000;
 // Durations for cleaning steps (milliseconds)
 const unsigned long NORMAL_PRESSURE_POT_INIT_DELAY = 100;
 const unsigned long SHORT_PRESSURE_POT_INIT_DELAY = 100;
-const unsigned long NORMAL_PAINT_GUN_ON_DELAY = 1500;
-const unsigned long SHORT_PAINT_GUN_ON_DELAY = 750; // Half of normal
+const unsigned long NORMAL_PAINT_GUN_ON_DELAY = 150;
+const unsigned long SHORT_PAINT_GUN_ON_DELAY = 75; // Half of normal
 
 CleaningState::CleaningState() : 
     _isCleaning(false),

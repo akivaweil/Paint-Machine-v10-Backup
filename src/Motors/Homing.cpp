@@ -5,6 +5,7 @@
 #include <FastAccelStepper.h>
 #include "utils/settings.h"
 #include "system/machine_state.h" // Include the updated header
+#include "settings/debounce_settings.h" // Added for centralized debounce intervals
 
 // Need access to the global rotation stepper pointer if used
 // This is already included via Rotation_Motor.h in Homing.h
@@ -23,16 +24,16 @@ Homing::Homing(FastAccelStepperEngine& engine,
 {
     // Initialize bounce objects here
     _xHomeSwitch.attach(X_HOME_SWITCH);
-    _xHomeSwitch.interval(HOMING_SWITCH_DEBOUNCE_MS);
+    _xHomeSwitch.interval(HOMING_SWITCH_DEBOUNCE_MS); 
     
     _yLeftHomeSwitch.attach(Y_LEFT_HOME_SWITCH);
-    _yLeftHomeSwitch.interval(HOMING_SWITCH_DEBOUNCE_MS);
+    _yLeftHomeSwitch.interval(HOMING_SWITCH_DEBOUNCE_MS); 
     
     _yRightHomeSwitch.attach(Y_RIGHT_HOME_SWITCH);
-    _yRightHomeSwitch.interval(HOMING_SWITCH_DEBOUNCE_MS);
+    _yRightHomeSwitch.interval(HOMING_SWITCH_DEBOUNCE_MS); 
     
     _zHomeSwitch.attach(Z_HOME_SWITCH);
-    _zHomeSwitch.interval(HOMING_SWITCH_DEBOUNCE_MS);
+    _zHomeSwitch.interval(HOMING_SWITCH_DEBOUNCE_MS); 
 }
 
 // Utility function implementation (keep it private to this class for now)
@@ -45,8 +46,22 @@ bool Homing::homeAllAxes() {
     Serial.println("Starting Home All Axes sequence...");
     // setMachineState(MachineState::HOMING); // REMOVED
     
+    Serial.println("Homing: Allowing a brief moment for system to settle...");
+    delay(250); // Brief pause for any transient noise from previous operations to settle
+    
     //! STEP 1: Initialize homing sequence
-    Serial.println("Starting homing sequence...");
+    Serial.println("Homing: Starting homing sequence proper...");
+
+    // Log initial switch states before any homing movement
+    Serial.println("Homing: Initial switch states (before movement, after Bounce2 update):");
+    _xHomeSwitch.update();
+    Serial.printf("  X Home Switch (Pin %d): Raw State = %d, Bounce2 State = %d\n", X_HOME_SWITCH, digitalRead(X_HOME_SWITCH), _xHomeSwitch.read());
+    _yLeftHomeSwitch.update();
+    Serial.printf("  Y Left Home Switch (Pin %d): Raw State = %d, Bounce2 State = %d\n", Y_LEFT_HOME_SWITCH, digitalRead(Y_LEFT_HOME_SWITCH), _yLeftHomeSwitch.read());
+    _yRightHomeSwitch.update();
+    Serial.printf("  Y Right Home Switch (Pin %d): Raw State = %d, Bounce2 State = %d\n", Y_RIGHT_HOME_SWITCH, digitalRead(Y_RIGHT_HOME_SWITCH), _yRightHomeSwitch.read());
+    _zHomeSwitch.update();
+    Serial.printf("  Z Home Switch (Pin %d): Raw State = %d, Bounce2 State = %d\n", Z_HOME_SWITCH, digitalRead(Z_HOME_SWITCH), _zHomeSwitch.read());
 
     //! STEP 2: Configure switch pins (pins attached in constructor)
     

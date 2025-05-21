@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "Setup.h"
 #include "utils/settings.h"
+#include "settings/debounce_settings.h" // Added for centralized debounce intervals
 
 // Include necessary libraries and headers
 #include <FastAccelStepper.h>
@@ -161,16 +162,16 @@ void initializeMotorsAndSwitches() {
     
     // Debouncer Setup
     debounceX.attach(X_HOME_SWITCH);
-    debounceX.interval(DEBOUNCE_INTERVAL);
+    debounceX.interval(GENERAL_DEBOUNCE_MS);
     
     debounceY_Left.attach(Y_LEFT_HOME_SWITCH);
-    debounceY_Left.interval(DEBOUNCE_INTERVAL);
+    debounceY_Left.interval(GENERAL_DEBOUNCE_MS);
     
     debounceY_Right.attach(Y_RIGHT_HOME_SWITCH);
-    debounceY_Right.interval(DEBOUNCE_INTERVAL);
+    debounceY_Right.interval(GENERAL_DEBOUNCE_MS);
 
     debounceZ.attach(Z_HOME_SWITCH);
-    debounceZ.interval(DEBOUNCE_INTERVAL);
+    debounceZ.interval(GENERAL_DEBOUNCE_MS);
 
     // Initialize global debouncers (includes PNP Cycle Sensor)
     initializeGlobalDebouncers(); 

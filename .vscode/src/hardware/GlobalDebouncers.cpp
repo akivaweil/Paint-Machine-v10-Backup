@@ -14,5 +14,5 @@ void initializeGlobalDebouncers() {
     // Use INPUT_PULLUP so the pin is HIGH when idle and LOW when active.
     // Bounce2's attach(pin, mode) sets the pinMode internally.
     g_pnpCycleSensorDebouncer.attach(PNP_CYCLE_SENSOR_PIN, INPUT_PULLUP);
-    g_pnpCycleSensorDebouncer.interval(20); // Debounce interval of 20 milliseconds
+    g_pnpCycleSensorDebouncer.interval(2); // Debounce interval of 20 milliseconds
 }

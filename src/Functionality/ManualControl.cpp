@@ -131,6 +131,10 @@ void handleManualRotateClockwise90() {
     Serial.printf("Current Tray Angle: %.2f deg, New Target: %.2f deg\n", currentAngle_deg, newTargetAngle_deg);
     rotateToAngle(newTargetAngle_deg);
     Serial.println("Manual tray rotation CW 90 complete.");
+    
+    // Reset position to zero after manual rotation
+    rotationStepper->setCurrentPosition(0);
+    Serial.println("Rotation position reset to zero.");
 }
 
 void handleManualRotateCounterClockwise90() {
@@ -159,4 +163,8 @@ void handleManualRotateCounterClockwise90() {
     Serial.printf("Current Tray Angle: %.2f deg, New Target: %.2f deg\n", currentAngle_deg, newTargetAngle_deg);
     rotateToAngle(newTargetAngle_deg);
     Serial.println("Manual tray rotation CCW 90 complete.");
+    
+    // Reset position to zero after manual rotation
+    rotationStepper->setCurrentPosition(0);
+    Serial.println("Rotation position reset to zero.");
 } 

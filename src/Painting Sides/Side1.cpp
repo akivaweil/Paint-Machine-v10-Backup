@@ -135,6 +135,14 @@ bool paintSide1Pattern() {
     //! STEP 6: Raise to safe Z height (Was STEP 8)
     moveToXYZ(finalX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
 
+    //! STEP 7: Move to position (3,3) before homing
+    Serial.println("Moving to position (3,3,0) before homing...");
+    long xHoming = (long)(3.0 * STEPS_PER_INCH_XYZ);
+    long yHoming = (long)(3.0 * STEPS_PER_INCH_XYZ);
+    long zHoming = 0;
+    moveToXYZ(xHoming, DEFAULT_X_SPEED, yHoming, DEFAULT_Y_SPEED, zHoming, DEFAULT_Z_SPEED);
+    Serial.println("Reached position (3,3,0).");
+
     //! Stage 5: Transition back to Homing State after completion
     Serial.println("Side 1 painting complete. Transitioning to Homing State...");
     stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call

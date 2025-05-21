@@ -54,6 +54,9 @@ void PaintingState::enter() {
 }
 
 void PaintingState::update() {
+    // Declare variables outside of switch statement
+    long xPos, yPos, zPos;
+    
     switch (currentStep) {
         case PS_REQUEST_PRE_PAINT_CLEAN:
             Serial.println("PaintingState: Requesting short pre-paint clean.");
@@ -73,15 +76,20 @@ void PaintingState::update() {
             Serial.println("PaintingState: Pre-paint clean complete. Starting all sides painting routine.");
             paintAllSides(); // This is assumed to be a blocking call
             Serial.println("PaintingState: All Sides Painting routine finished.");
-            currentStep = PS_MOVE_TO_ZERO_BEFORE_HOMING;
-            // Fall-through because paintAllSides() is blocking.
-            // If it became non-blocking, we'd break here and wait for its completion signal.
+            currentStep = PS_MOVE_TO_POSITION_BEFORE_HOMING;
+            break;
 
-        case PS_MOVE_TO_ZERO_BEFORE_HOMING:
-            Serial.println("PaintingState: Moving to 0,0,0 before Homing.");
-            moveToXYZ(0, DEFAULT_X_SPEED, 0, DEFAULT_Y_SPEED, 0, DEFAULT_Z_SPEED); // Blocking
+        case PS_MOVE_TO_POSITION_BEFORE_HOMING:
+            Serial.println("PaintingState: Moving to position (3,3,0) before Homing.");
+            // Convert inches to steps
+            xPos = (long)(3.0 * STEPS_PER_INCH_XYZ);
+            yPos = (long)(3.0 * STEPS_PER_INCH_XYZ);
+            zPos = 0;
+            
+            moveToXYZ(xPos, DEFAULT_X_SPEED, yPos, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED); // Blocking
+            Serial.println("PaintingState: Reached position (3,3,0).");
             currentStep = PS_REQUEST_HOMING;
-            // Fall-through
+            // Fall through intentionally to PS_REQUEST_HOMING
         
         case PS_REQUEST_HOMING:
             Serial.println("PaintingState: Sequence complete. Requesting Homing State.");

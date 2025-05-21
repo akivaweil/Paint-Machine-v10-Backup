@@ -1,6 +1,7 @@
 #include "motors/XYZ_Movements.h"
 #include <Arduino.h>
 #include "utils/settings.h" // Likely needed for pin definitions, steps/mm, etc.
+#include "settings/debounce_settings.h" // Added for centralized debounce intervals
 
 // Include motor control library
 #include <FastAccelStepper.h>
@@ -48,16 +49,16 @@ void setupMotors() {
     
     // Setup Bounce2 for debouncing
     debounceX.attach(X_HOME_SWITCH);
-    debounceX.interval(DEBOUNCE_INTERVAL);
+    debounceX.interval(GENERAL_DEBOUNCE_MS); // Changed from DEBOUNCE_INTERVAL
     
     debounceY_Left.attach(Y_LEFT_HOME_SWITCH);
-    debounceY_Left.interval(DEBOUNCE_INTERVAL);
+    debounceY_Left.interval(GENERAL_DEBOUNCE_MS); // Changed from DEBOUNCE_INTERVAL
     
     debounceY_Right.attach(Y_RIGHT_HOME_SWITCH);
-    debounceY_Right.interval(DEBOUNCE_INTERVAL);
+    debounceY_Right.interval(GENERAL_DEBOUNCE_MS); // Changed from DEBOUNCE_INTERVAL
 
     debounceZ.attach(Z_HOME_SWITCH);
-    debounceZ.interval(DEBOUNCE_INTERVAL);
+    debounceZ.interval(GENERAL_DEBOUNCE_MS); // Changed from DEBOUNCE_INTERVAL
 
     Serial.println("Motors and Switches Setup Complete.");
 }

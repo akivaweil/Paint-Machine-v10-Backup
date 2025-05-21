@@ -308,7 +308,7 @@ void PnPState::initializeHardware() {
     // Setup debouncer for PNP Cycle Sensor
     // Assumes PNP_CYCLE_SENSOR_PIN is already configured (e.g., INPUT_PULLUP in main setup)
     // pnpCycleSensorDebouncer.attach(PNP_CYCLE_SENSOR_PIN); // REMOVED: Using global debouncer
-    // pnpCycleSensorDebouncer.interval(20); // REMOVED: Using global debouncer
+    // pnpCycleSensorDebouncer.; // REMOVED: Using global debouncer
     Serial.println("PNP Cycle Sensor debouncer is now global and initialized in Setup.");
 
     // Initialize hardware to safe state
