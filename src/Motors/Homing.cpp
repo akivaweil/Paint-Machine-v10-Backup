@@ -81,35 +81,75 @@ bool Homing::homeAllAxes() {
         rotationStepper->setAcceleration(DEFAULT_ROT_ACCEL / 2); //? Half acceleration for homing
     }
     
-    //! STEP 4: Start all motors moving toward home switches
-    Serial.println("Moving all axes toward home switches...");
-    // Debug: Check direction pin state BEFORE runBackward()
-    pinMode(X_DIR_PIN, OUTPUT); // Ensure pin mode is set if not already
-    Serial.printf("  DEBUG: X_DIR_PIN (%d) state before runBackward: %d\n", X_DIR_PIN, digitalRead(X_DIR_PIN));
-    _stepperX->runBackward(); 
-    Serial.printf("  DEBUG: X_DIR_PIN (%d) state AFTER runBackward: %d\n", X_DIR_PIN, digitalRead(X_DIR_PIN));
-    _stepperY_Left->runBackward();
-    _stepperY_Right->runBackward();
-    _stepperZ->runForward(); //? Z moves forward (UP) to home
+    //! STEP 4: Start motors moving toward home switches, if not already there
+    Serial.println("Moving all axes toward home switches (if not already at switch)...");
+
+    // Initialize homing status flags (ensure they are defined before this block)
+    bool xHomed = false;
+    bool yLeftHomed = false;
+    bool yRightHomed = false;
+    bool zHomed = false;
+    // rotationActuallyHomed will be set later
+    // rotationHomed will be evaluated later
+
+    _xHomeSwitch.update(); // Initial read before moving
+    if (_xHomeSwitch.read() != HIGH) {
+        Serial.println("  X not at switch, starting X homing movement.");
+        // Debug: Check direction pin state BEFORE runBackward()
+        pinMode(X_DIR_PIN, OUTPUT); // Ensure pin mode is set if not already
+        Serial.printf("  DEBUG: X_DIR_PIN (%d) state before runBackward: %d\n", X_DIR_PIN, digitalRead(X_DIR_PIN));
+        _stepperX->runBackward(); 
+        Serial.printf("  DEBUG: X_DIR_PIN (%d) state AFTER runBackward: %d\n", X_DIR_PIN, digitalRead(X_DIR_PIN));
+    } else {
+        Serial.println("  X already at switch, marking as homed.");
+        if (_stepperX->isRunning()) _stepperX->forceStop(); // Stop if somehow running
+        _stepperX->setCurrentPosition(0); // Define current as 0 (avoids issues with forceStopAndNewPosition if not actually moving)
+        xHomed = true; 
+    }
+
+    _yLeftHomeSwitch.update();
+    if (_yLeftHomeSwitch.read() != HIGH) {
+        Serial.println("  Y-Left not at switch, starting Y-Left homing movement.");
+        _stepperY_Left->runBackward();
+    } else {
+        Serial.println("  Y-Left already at switch, marking as homed.");
+        if (_stepperY_Left->isRunning()) _stepperY_Left->forceStop();
+        _stepperY_Left->setCurrentPosition(0);
+        yLeftHomed = true;
+    }
+
+    _yRightHomeSwitch.update();
+    if (_yRightHomeSwitch.read() != HIGH) {
+        Serial.println("  Y-Right not at switch, starting Y-Right homing movement.");
+        _stepperY_Right->runBackward();
+    } else {
+        Serial.println("  Y-Right already at switch, marking as homed.");
+        if (_stepperY_Right->isRunning()) _stepperY_Right->forceStop();
+        _stepperY_Right->setCurrentPosition(0);
+        yRightHomed = true;
+    }
+
+    _zHomeSwitch.update();
+    // Assuming Z home switch is also HIGH when triggered and Z moves UP (forward) to home
+    if (_zHomeSwitch.read() != HIGH) { 
+        Serial.println("  Z not at switch, starting Z homing movement.");
+        _stepperZ->runForward(); 
+    } else {
+        Serial.println("  Z already at switch, marking as homed.");
+        if (_stepperZ->isRunning()) _stepperZ->forceStop();
+        _stepperZ->setCurrentPosition(0);
+        zHomed = true;
+    }
     
     //? Rotation homing is handled differently now to ensure shortest path and blocking execution
     //? It will be performed sequentially before the main polling loop for X, Y, Z.
     
-    //! STEP 5: Track homing status for each motor
-    bool xHomed = false;
-    bool yLeftHomed = false;
-    bool yRightHomed = false;  // Add tracking for Y right
-    bool zHomed = false;
+    //! STEP 5: Track homing status for each motor (already declared and partially set above)
+    // bool xHomed = false; // MOVED UP
+    // bool yLeftHomed = false; // MOVED UP
+    // bool yRightHomed = false;  // MOVED UP
+    // bool zHomed = false; // MOVED UP
     bool rotationActuallyHomed = false; // Flag to indicate if rotation homing was attempted and completed
-
-    // Perform rotation homing first if stepper exists
-    if (rotationStepper) {
-        Serial.println("Starting rotation homing to 0 degrees (shortest path)...");
-        rotateToAngle(0); // This is BLOCKING and uses shortest path logic.
-        rotationStepper->setCurrentPosition(0); // Explicitly set logical position to 0 steps
-        Serial.println("Rotation axis homed and set to 0 degrees.");
-        rotationActuallyHomed = true;
-    }
     
     bool rotationHomed = (rotationStepper == NULL) || rotationActuallyHomed; // True if no stepper or if homing completed
     
@@ -122,10 +162,10 @@ bool Homing::homeAllAxes() {
         if (millis() - startTime > HOMING_TIMEOUT_MS) {
             Serial.println("ERROR: Homing timeout!");
             //? Stop any motors that haven't homed yet
-            if (!xHomed) _stepperX->forceStopAndNewPosition(_stepperX->getCurrentPosition());
-            if (!yLeftHomed) _stepperY_Left->forceStopAndNewPosition(_stepperY_Left->getCurrentPosition());
-            if (!yRightHomed) _stepperY_Right->forceStopAndNewPosition(_stepperY_Right->getCurrentPosition()); // Stop Y Right too
-            if (!zHomed) _stepperZ->forceStopAndNewPosition(_stepperZ->getCurrentPosition());
+            if (!xHomed && _stepperX->isRunning()) _stepperX->forceStopAndNewPosition(_stepperX->getCurrentPosition());
+            if (!yLeftHomed && _stepperY_Left->isRunning()) _stepperY_Left->forceStopAndNewPosition(_stepperY_Left->getCurrentPosition());
+            if (!yRightHomed && _stepperY_Right->isRunning()) _stepperY_Right->forceStopAndNewPosition(_stepperY_Right->getCurrentPosition()); // Stop Y Right too
+            if (!zHomed && _stepperZ->isRunning()) _stepperZ->forceStopAndNewPosition(_stepperZ->getCurrentPosition());
             // Rotation stepper is already stopped if it was homed, or forceStop if it was stuck in rotateToAngle (though unlikely with its internal timeout)
             if (rotationStepper && rotationStepper->isRunning()) { // Check if it somehow got stuck despite blocking call
                  rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
@@ -135,12 +175,17 @@ bool Homing::homeAllAxes() {
         }
         
         //! Process X switch with Bounce2
-        if (!xHomed) {
+        if (!xHomed) { // Only process if not already marked homed
             _xHomeSwitch.update();
             if (_xHomeSwitch.read() == HIGH) { 
-                _stepperX->forceStopAndNewPosition(0);
+                // _stepperX->forceStopAndNewPosition(0); // Original line
+                if (_stepperX->isRunning()) { // Only stop if it was actually running towards switch
+                    _stepperX->forceStopAndNewPosition(0);
+                } else { // If it wasn't running but switch is high, it means it was pre-homed or an edge case
+                    _stepperX->setCurrentPosition(0); // Ensure logical position is 0
+                }
                 xHomed = true;
-                Serial.println("X Home switch triggered.");
+                Serial.println("X Home switch triggered (during while loop).");
             }
         }
         
@@ -148,9 +193,14 @@ bool Homing::homeAllAxes() {
         if (!yLeftHomed) {
             _yLeftHomeSwitch.update();
             if (_yLeftHomeSwitch.read() == HIGH) { 
-                _stepperY_Left->forceStopAndNewPosition(0);
+                // _stepperY_Left->forceStopAndNewPosition(0); // Original line
+                if (_stepperY_Left->isRunning()) {
+                    _stepperY_Left->forceStopAndNewPosition(0);
+                } else {
+                    _stepperY_Left->setCurrentPosition(0);
+                }
                 yLeftHomed = true;
-                Serial.println("Y Left Home switch triggered.");
+                Serial.println("Y Left Home switch triggered (during while loop).");
             }
         }
         
@@ -158,9 +208,14 @@ bool Homing::homeAllAxes() {
         if (!yRightHomed) {
             _yRightHomeSwitch.update();
             if (_yRightHomeSwitch.read() == HIGH) { 
-                _stepperY_Right->forceStopAndNewPosition(0);
+                // _stepperY_Right->forceStopAndNewPosition(0); // Original line
+                if (_stepperY_Right->isRunning()) {
+                    _stepperY_Right->forceStopAndNewPosition(0);
+                } else {
+                    _stepperY_Right->setCurrentPosition(0);
+                }
                 yRightHomed = true;
-                Serial.println("Y Right Home switch triggered.");
+                Serial.println("Y Right Home switch triggered (during while loop).");
             }
         }
         
@@ -168,9 +223,14 @@ bool Homing::homeAllAxes() {
         if (!zHomed) {
             _zHomeSwitch.update();
             if (_zHomeSwitch.read() == HIGH) { 
-                _stepperZ->forceStopAndNewPosition(0);
+                // _stepperZ->forceStopAndNewPosition(0); // Original line
+                if (_stepperZ->isRunning()) {
+                    _stepperZ->forceStopAndNewPosition(0);
+                } else {
+                    _stepperZ->setCurrentPosition(0);
+                }
                 zHomed = true;
-                Serial.println("Z Home switch triggered.");
+                Serial.println("Z Home switch triggered (during while loop).");
             }
         }
         

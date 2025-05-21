@@ -17,9 +17,10 @@ extern FastAccelStepper *stepperY_Right; // Needed for Homing class constructor
 extern FastAccelStepper *stepperZ;      // Added for Z move
 extern bool isPressurePot_ON; // Added for pressure pot check
 extern FastAccelStepperEngine engine; // Needed for Homing class constructor
+extern FastAccelStepper *rotationStepper; // ADDED for rotation motor reset
 
 // Global variable definition for requested coats
-int g_requestedCoats = 1; // Default to 1 coat
+int g_requestedCoats = 3; // Default to 3 coats
 int g_interCoatDelaySeconds = 10; // ADDED: Default 10 seconds delay
 
 //* ************************************************************************
@@ -262,4 +263,68 @@ void paintAllSides() {
     }
 
     Serial.println("All Sides Painting Process Fully Completed.");
+
+    //! Move to final resting position (3,3)
+    Serial.println("Moving to final resting position (X=3 inches, Y=3 inches).");
+    long target_x_final_steps = (long)(3.0f * STEPS_PER_INCH_XYZ);
+    long target_y_final_steps = (long)(3.0f * STEPS_PER_INCH_XYZ);
+
+    stepperX->setSpeedInHz(DEFAULT_X_SPEED);
+    stepperX->setAcceleration(DEFAULT_X_ACCEL);
+    stepperX->moveTo(target_x_final_steps);
+
+    stepperY_Left->setSpeedInHz(DEFAULT_Y_SPEED); // Assuming DEFAULT_Y_SPEED is defined
+    stepperY_Left->setAcceleration(DEFAULT_Y_ACCEL); // Assuming DEFAULT_Y_ACCEL is defined
+    stepperY_Left->moveTo(target_y_final_steps);
+
+    // Wait for X to complete
+    while (stepperX->isRunning()) {
+        if (checkForHomeCommand()) {
+            Serial.println("Home command received during final X move. Stopping.");
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+            if (stepperY_Left->isRunning()) { // Also stop Y if it's running
+                 stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+            }
+            return; // Exit the function
+        }
+        delay(1);
+    }
+
+    // Wait for Y to complete
+    while (stepperY_Left->isRunning()) {
+        if (checkForHomeCommand()) {
+            Serial.println("Home command received during final Y move. Stopping.");
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+            // X would have already stopped or completed
+            return; // Exit the function
+        }
+        delay(1);
+    }
+
+    Serial.println("Reached final resting position (X=3, Y=3).");
+
+    //! Reset rotation motor to 0 degrees
+    if (rotationStepper) {
+        Serial.println("Resetting rotation motor to 0 degrees.");
+        rotateToAngle(0); // Assuming this function is available from Rotation_Motor.h
+        
+        // Wait for rotation to complete
+        unsigned long rotationStartTime = millis();
+        while (rotationStepper->isRunning()) {
+            if (checkForHomeCommand()) {
+                Serial.println("Home command received during final rotation motor reset. Stopping.");
+                rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
+                return; // Exit the function
+            }
+            if (millis() - rotationStartTime > 15000) { // 15-second timeout for rotation
+                Serial.println("ERROR: Timeout resetting rotation motor!");
+                rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
+                return; // Exit the function
+            }
+            delay(1);
+        }
+        Serial.println("Rotation motor reset to 0 degrees.");
+    } else {
+        Serial.println("Rotation stepper not available, skipping reset to 0 degrees.");
+    }
 } 

@@ -1441,7 +1441,7 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
                 <div class="multiple-coats-controls">
                     <div class="coats-input-group">
                         <label for="numCoats">Number of Coats:</label>
-                        <input type="number" id="numCoats" class="setting-input" min="1" max="10" value="2" step="1">
+                        <input type="number" id="numCoats" class="setting-input" min="1" max="10" value="3" step="1">
                     </div>
                     <div class="coats-input-group">
                         <label for="interCoatDelay">Delay (s):</label>

@@ -538,12 +538,6 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         // Home all axes
         Serial.println("Homing all axes immediately...");
         
-        // Force stop any running motors first
-        if (stepperX->isRunning()) stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-        if (stepperY_Left->isRunning()) stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
-        if (stepperY_Right->isRunning()) stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
-        if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
-        
         // Set the home command received flag to interrupt any ongoing painting operations
         homeCommandReceived = true;
         
