@@ -186,31 +186,31 @@ void paintAllSides() {
         Serial.println("Reached loading bar start position.");
 
         // --- START: Custom servo and X-axis movement during inter-coat delay ---
-        Serial.println("Inter-coat: Moving X to 5 inches from home.");
-        long five_inches_from_home_steps = (long)(5.0f * STEPS_PER_INCH_XYZ);
-        stepperX->moveTo(five_inches_from_home_steps);
-        while (stepperX->isRunning()) {
-            if (checkForHomeCommand()) {
-                Serial.printf("Home command during X move to 5in before coat %d. Process terminated.\n", coat + 1);
-                stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-                return;
-            }
-            delay(1);
-        }
+        // Serial.println("Inter-coat: Moving X to 5 inches from home.");
+        // long five_inches_from_home_steps = (long)(5.0f * STEPS_PER_INCH_XYZ);
+        // stepperX->moveTo(five_inches_from_home_steps);
+        // while (stepperX->isRunning()) {
+        //     if (checkForHomeCommand()) {
+        //         Serial.printf("Home command during X move to 5in before coat %d. Process terminated.\n", coat + 1);
+        //         stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        //         return;
+        //     }
+        //     delay(1);
+        // }
 
-        Serial.println("Inter-coat: Moving X to home (0 inches).");
-        stepperX->moveTo(0); // Move to 0 (home)
-        while (stepperX->isRunning()) {
-            if (checkForHomeCommand()) {
-                Serial.printf("Home command during X move to 0in before coat %d. Process terminated.\n", coat + 1);
-                stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-                return;
-            }
-            delay(1);
-        }
+        // Serial.println("Inter-coat: Moving X to home (0 inches).");
+        // stepperX->moveTo(0); // Move to 0 (home)
+        // while (stepperX->isRunning()) {
+        //     if (checkForHomeCommand()) {
+        //         Serial.printf("Home command during X move to 0in before coat %d. Process terminated.\n", coat + 1);
+        //         stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        //         return;
+        //     }
+        //     delay(1);
+        // }
 
-        Serial.println("Inter-coat: Setting servo to 180 degrees.");
-        myServo.setAngle(180);
+        // Serial.println("Inter-coat: Setting servo to 180 degrees.");
+        // myServo.setAngle(180);
         // --- END: Custom servo and X-axis movement during inter-coat delay ---
 
         Serial.println("Starting X-axis loading bar movement for delay.");
