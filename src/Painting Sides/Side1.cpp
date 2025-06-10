@@ -106,21 +106,29 @@ bool paintSide1Pattern() {
     long shiftXDistance = (long)(paintingSettings.getSide1ShiftX() * STEPS_PER_INCH_XYZ); // Use getter for shift distance
     long xSpeed = paintingSettings.getSide1PaintingXSpeed(); // Use getter for X speed
     long ySpeed = paintingSettings.getSide1PaintingYSpeed(); // Use getter for Y speed (though Y isn't moving)
-    long shutOffOffsetSteps = (long)(0.5f * STEPS_PER_INCH_XYZ); // 0.5 inches in steps
+    long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 
-    Serial.println("Side 1 Pattern: Performing single X shift");
+    Serial.println("Side 1 Pattern: Performing single X shift with 0.25in paint offsets");
+
+    // Move 0.25 inches without paint gun
+    long startPaintX = currentX + paintOffsetSteps;
+    moveToXYZ(startPaintX, xSpeed, currentY, ySpeed, zPos, DEFAULT_Z_SPEED);
+    currentX = startPaintX;
+    
     paintGun_ON();
+    Serial.println("Paint gun ON after 0.25in offset");
 
-    // Calculate the X position to turn off the paint gun
-    long targetX_paintOn = currentX + shiftXDistance - shutOffOffsetSteps;
+    // Calculate the X position to turn off the paint gun (0.25 inches before end)
+    long endPaintX = startX + shiftXDistance - paintOffsetSteps;
     
     // Move with paint gun ON
-    moveToXYZ(targetX_paintOn, xSpeed, currentY, ySpeed, zPos, DEFAULT_Z_SPEED);
+    moveToXYZ(endPaintX, xSpeed, currentY, ySpeed, zPos, DEFAULT_Z_SPEED);
+    currentX = endPaintX;
     
     paintGun_OFF(); // Turn off gun
-    Serial.println("Paint gun OFF, completing travel.");
+    Serial.println("Paint gun OFF, 0.25in before end. Completing travel.");
 
-    // Complete the remaining travel with paint gun OFF
+    // Complete the remaining 0.25 inches with paint gun OFF
     long finalX = startX + shiftXDistance; // Final target X position
     moveToXYZ(finalX, xSpeed, currentY, ySpeed, zPos, DEFAULT_Z_SPEED); 
 

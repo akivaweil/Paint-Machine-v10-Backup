@@ -45,6 +45,7 @@ void paintSide2Pattern() {
     long paint_x_speed = paintingSettings.getSide2PaintingXSpeed(); // Use Side 2 settings
     long paint_y_speed = paintingSettings.getSide2PaintingYSpeed(); // Use Side 2 settings
     long first_sweep_paint_y_speed_side2 = (long)(paint_y_speed * 0.75f);
+    long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 
     //! Set Servo Angle FIRST
     myServo.setAngle(servoAngle);
@@ -79,21 +80,45 @@ void paintSide2Pattern() {
         long current_paint_y_speed = paint_y_speed;
 
         if (isNegativeYSweep) {
-            Serial.printf("Side 2 Pattern: Sweep %d (-Y)\\\n", i + 1);
+            Serial.printf("Side 2 Pattern: Sweep %d (-Y) with 0.25in paint offsets\\\n", i + 1);
             if (i == 0) { // First sweep
                 current_paint_y_speed = first_sweep_paint_y_speed_side2;
                 Serial.printf("Side 2 Pattern: Applying 75%% speed for first sweep: %ld\\n", current_paint_y_speed);
             }
+            
+            // Move 0.25 inches without paint gun
+            long startPaintY = currentY - paintOffsetSteps;
+            moveToXYZ(currentX, paint_x_speed, startPaintY, current_paint_y_speed, zPos, DEFAULT_Z_SPEED);
+            
             paintGun_ON();
+            
+            // Move with paint gun ON (total distance minus 0.5 inches)
+            long endPaintY = currentY - sweepYDistance + paintOffsetSteps;
+            moveToXYZ(currentX, paint_x_speed, endPaintY, current_paint_y_speed, zPos, DEFAULT_Z_SPEED);
+            
+            paintGun_OFF();
+            
+            // Complete final 0.25 inches without paint gun
             currentY -= sweepYDistance;
             moveToXYZ(currentX, paint_x_speed, currentY, current_paint_y_speed, zPos, DEFAULT_Z_SPEED);
-            paintGun_OFF();
         } else {
-            Serial.printf("Side 2 Pattern: Sweep %d (+Y)\\\n", i + 1);
+            Serial.printf("Side 2 Pattern: Sweep %d (+Y) with 0.25in paint offsets\\\n", i + 1);
+            
+            // Move 0.25 inches without paint gun
+            long startPaintY = currentY + paintOffsetSteps;
+            moveToXYZ(currentX, paint_x_speed, startPaintY, current_paint_y_speed, zPos, DEFAULT_Z_SPEED);
+            
             paintGun_ON();
+            
+            // Move with paint gun ON (total distance minus 0.5 inches)
+            long endPaintY = currentY + sweepYDistance - paintOffsetSteps;
+            moveToXYZ(currentX, paint_x_speed, endPaintY, current_paint_y_speed, zPos, DEFAULT_Z_SPEED);
+            
+            paintGun_OFF();
+            
+            // Complete final 0.25 inches without paint gun
             currentY += sweepYDistance;
             moveToXYZ(currentX, paint_x_speed, currentY, current_paint_y_speed, zPos, DEFAULT_Z_SPEED);
-            paintGun_OFF();
         }
 
         if (checkForHomeCommand()) {
@@ -138,15 +163,27 @@ void paintSide2Pattern() {
     long finalXPassZPos_Side2 = (long)(-1.75 * STEPS_PER_INCH_XYZ);
     Serial.printf("Side 2 Pattern: Setting Z to %.2f inches for final X pass\n", -1.75);
 
-    //! Move +20 inches in X (gun ON, then OFF)
-    Serial.println("Side 2 Pattern: Turning gun ON for +20in X sweep.");
+    //! Move +23 inches in X with 0.25in paint offsets
+    Serial.println("Side 2 Pattern: Starting +23in X sweep with 0.25in paint offsets.");
+    long finalXSweepDistance = (long)(23.0 * STEPS_PER_INCH_XYZ);
+    
+    // Move 0.25 inches without paint gun
+    long startPaintX2 = currentX + paintOffsetSteps;
+    moveToXYZ(startPaintX2, paint_x_speed, currentY, paint_y_speed, finalXPassZPos_Side2, DEFAULT_Z_SPEED);
+    
     paintGun_ON();
-    long endSeq_targetX2 = currentX + (long)(23.0 * STEPS_PER_INCH_XYZ);
-    Serial.printf("Side 2 Pattern: Sweeping to X=%ld (relative +20in)\
-", endSeq_targetX2);
-    moveToXYZ(endSeq_targetX2, paint_x_speed, currentY, paint_y_speed, finalXPassZPos_Side2, DEFAULT_Z_SPEED); // Use finalXPassZPos_Side2
+    Serial.println("Side 2 Pattern: Gun ON after 0.25in offset for final X sweep.");
+    
+    // Move with paint gun ON (total distance minus 0.5 inches)
+    long endPaintX2 = currentX + finalXSweepDistance - paintOffsetSteps;
+    moveToXYZ(endPaintX2, paint_x_speed, currentY, paint_y_speed, finalXPassZPos_Side2, DEFAULT_Z_SPEED);
+    
     paintGun_OFF();
-    Serial.println("Side 2 Pattern: Gun OFF after +20in X sweep.");
+    Serial.println("Side 2 Pattern: Gun OFF, 0.25in before end of X sweep.");
+    
+    // Complete final 0.25 inches without paint gun
+    long endSeq_targetX2 = currentX + finalXSweepDistance;
+    moveToXYZ(endSeq_targetX2, paint_x_speed, currentY, paint_y_speed, finalXPassZPos_Side2, DEFAULT_Z_SPEED);
     currentX = endSeq_targetX2;
 
     if (checkForHomeCommand()) {

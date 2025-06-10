@@ -85,13 +85,26 @@ void paintSide3Pattern() {
     long paint_x_speed = paintingSettings.getSide3PaintingXSpeed();
     long paint_y_speed = paintingSettings.getSide3PaintingYSpeed();
     long final_sweep_paint_x_speed_side3 = (long)(paint_x_speed * 0.5f);
+    long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 
     // First sweep: X- direction
-    Serial.println("Side 3 Pattern: First sweep X-");
+    Serial.println("Side 3 Pattern: First sweep X- with 0.25in paint offsets");
+    
+    // Move 0.25 inches without paint gun
+    long startPaintX1 = currentX - paintOffsetSteps;
+    moveToXYZ(startPaintX1, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
     paintGun_ON();
+    
+    // Move with paint gun ON (total distance minus 0.5 inches)
+    long endPaintX1 = currentX - sweepX_steps + paintOffsetSteps;
+    moveToXYZ(endPaintX1, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
+    paintGun_OFF();
+    
+    // Complete final 0.25 inches without paint gun
     currentX -= sweepX_steps;
     moveToXYZ(currentX, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
-    paintGun_OFF();
 
     if (checkForHomeCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
@@ -105,11 +118,23 @@ void paintSide3Pattern() {
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
 
     // Second sweep: X+ direction
-    Serial.println("Side 3 Pattern: Second sweep X+");
+    Serial.println("Side 3 Pattern: Second sweep X+ with 0.25in paint offsets");
+    
+    // Move 0.25 inches without paint gun
+    long startPaintX2 = currentX + paintOffsetSteps;
+    moveToXYZ(startPaintX2, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
     paintGun_ON();
+    
+    // Move with paint gun ON (total distance minus 0.5 inches)
+    long endPaintX2 = currentX + sweepX_steps - paintOffsetSteps;
+    moveToXYZ(endPaintX2, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
+    paintGun_OFF();
+    
+    // Complete final 0.25 inches without paint gun
     currentX += sweepX_steps;
     moveToXYZ(currentX, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
-    paintGun_OFF();
 
     if (checkForHomeCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
@@ -123,11 +148,23 @@ void paintSide3Pattern() {
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
 
     // Third sweep: X- direction
-    Serial.println("Side 3 Pattern: Third sweep X-");
+    Serial.println("Side 3 Pattern: Third sweep X- with 0.25in paint offsets");
+    
+    // Move 0.25 inches without paint gun
+    long startPaintX3 = currentX - paintOffsetSteps;
+    moveToXYZ(startPaintX3, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
     paintGun_ON();
+    
+    // Move with paint gun ON (total distance minus 0.5 inches)
+    long endPaintX3 = currentX - sweepX_steps + paintOffsetSteps;
+    moveToXYZ(endPaintX3, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
+    paintGun_OFF();
+    
+    // Complete final 0.25 inches without paint gun
     currentX -= sweepX_steps;
     moveToXYZ(currentX, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
-    paintGun_OFF();
 
     if (checkForHomeCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
@@ -141,11 +178,23 @@ void paintSide3Pattern() {
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
 
     // Fourth sweep: X+ direction
-    Serial.println("Side 3 Pattern: Fourth sweep X+");
+    Serial.println("Side 3 Pattern: Fourth sweep X+ with 0.25in paint offsets");
+    
+    // Move 0.25 inches without paint gun
+    long startPaintX4 = currentX + paintOffsetSteps;
+    moveToXYZ(startPaintX4, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
     paintGun_ON();
+    
+    // Move with paint gun ON (total distance minus 0.5 inches)
+    long endPaintX4 = currentX + sweepX_steps - paintOffsetSteps;
+    moveToXYZ(endPaintX4, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
+    paintGun_OFF();
+    
+    // Complete final 0.25 inches without paint gun
     currentX += sweepX_steps;
     moveToXYZ(currentX, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
-    paintGun_OFF();
 
     if (checkForHomeCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
@@ -159,12 +208,24 @@ void paintSide3Pattern() {
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
 
     // Fifth sweep: X- direction (Final X painting movement)
-    Serial.println("Side 3 Pattern: Fifth sweep X-");
-    Serial.printf("Side 3 Pattern: Applying 75%% speed for final X sweep: %ld\n", final_sweep_paint_x_speed_side3);
+    Serial.println("Side 3 Pattern: Fifth sweep X- with 0.25in paint offsets");
+    Serial.printf("Side 3 Pattern: Applying 50%% speed for final X sweep: %ld\n", final_sweep_paint_x_speed_side3);
+    
+    // Move 0.25 inches without paint gun
+    long startPaintX5 = currentX - paintOffsetSteps;
+    moveToXYZ(startPaintX5, final_sweep_paint_x_speed_side3, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
     paintGun_ON();
+    
+    // Move with paint gun ON (total distance minus 0.5 inches)
+    long endPaintX5 = currentX - sweepX_steps + paintOffsetSteps;
+    moveToXYZ(endPaintX5, final_sweep_paint_x_speed_side3, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
+    
+    paintGun_OFF();
+    
+    // Complete final 0.25 inches without paint gun
     currentX -= sweepX_steps;
     moveToXYZ(currentX, final_sweep_paint_x_speed_side3, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED);
-    paintGun_OFF();
 
     if (checkForHomeCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);

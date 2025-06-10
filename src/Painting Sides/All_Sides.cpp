@@ -1,36 +1,36 @@
 #include <Arduino.h>
 #include "motors/PaintingSides.h"
-#include "../../include/web/Web_Dashboard_Commands.h" // For checkForHomeCommand
-#include "motors/ServoMotor.h" // Added for cleaning burst
-#include "hardware/paintGun_Functions.h" // Added for cleaning burst
-#include "hardware/pressurePot_Functions.h" // Added for pressure pot check
-#include "motors/XYZ_Movements.h" // Added for cleaning movement
-#include "utils/settings.h"     // Added for STEPS_PER_INCH_XYZ and speeds
-#include <FastAccelStepper.h>    // Added for stepper extern declarations
-#include "motors/Homing.h"      // For Homing class and homeAllAxes()
-#include "motors/Rotation_Motor.h" // For rotation motor reset
+#include "../../include/web/Web_Dashboard_Commands.h"
+#include "motors/ServoMotor.h"
+#include "hardware/paintGun_Functions.h"
+#include "hardware/pressurePot_Functions.h"
+#include "motors/XYZ_Movements.h"
+#include "utils/settings.h"
+#include <FastAccelStepper.h>
+#include "motors/Homing.h"
+#include "motors/Rotation_Motor.h"
+#include "system/StateMachine.h"
 
-extern ServoMotor myServo; // Added for cleaning burst
-extern FastAccelStepper *stepperX;      // Added for Z move
-extern FastAccelStepper *stepperY_Left; // Added for Z move
-extern FastAccelStepper *stepperY_Right; // Needed for Homing class constructor
-extern FastAccelStepper *stepperZ;      // Added for Z move
-extern bool isPressurePot_ON; // Added for pressure pot check
-extern FastAccelStepperEngine engine; // Needed for Homing class constructor
-extern FastAccelStepper *rotationStepper; // ADDED for rotation motor reset
+extern ServoMotor myServo;
+extern FastAccelStepper *stepperX;
+extern FastAccelStepper *stepperY_Left;
+extern FastAccelStepper *stepperY_Right;
+extern FastAccelStepper *stepperZ;
+extern bool isPressurePot_ON;
+extern FastAccelStepperEngine engine;
+extern FastAccelStepper *rotationStepper;
+extern StateMachine* stateMachine;
 
 // Global variable definition for requested coats
 int g_requestedCoats = 3; // Default to 3 coats
-int g_interCoatDelaySeconds = 10; // ADDED: Default 10 seconds delay
+int g_interCoatDelaySeconds = 10; // Default 10 seconds delay
 
 //* ************************************************************************
 //* ********************** ALL SIDES PAINTING ************************
 //* ************************************************************************
-// This file handles the sequence of painting all sides of the piece in three runs
-// Each run follows the same pattern (sides 4, 3, 2) with a loading bar animation
+// This file handles the sequence of painting all sides of the piece in multiple runs
+// Each run follows the same pattern (sides 4, 3, 2, 1) with a loading bar animation
 // between runs to show progress during the delay time.
-// This file handles the sequence of painting all sides of the piece in a single run
-// painting sides 4, 3, and 2.
 
 // Cleaning parameters
 const float CLEANING_X_INCH = 0.0;
@@ -40,24 +40,18 @@ const unsigned int CLEANING_X_SPEED = 15000;
 const unsigned int CLEANING_Y_SPEED = 15000;
 const unsigned int CLEANING_Z_SPEED = 4000;
 
-// const unsigned long ALL_SIDES_REPEAT_DELAY_MS = 10 * 1000; // REMOVED: Replaced by g_interCoatDelaySeconds
-
 // Define the loading bar X position as a constant to ensure consistency
 const float LOADING_BAR_X_START = 24.0f;
 const float LOADING_BAR_X_END = 0.0f;
 
 // Helper function to prepare for the next painting sequence
-// This only does minimal preparation to ensure consistent painting
 void _prepareForPaintingSequence() {
-    // Reset servo to a safe initial position (each side sets its own angle)
     myServo.setAngle(0);
     Serial.println("Reset servo angle to 0 degrees before painting sequence");
     
-    // Ensure paint gun is off before starting a sequence
     paintGun_OFF();
     Serial.println("Ensured paint gun is off before starting painting sequence");
     
-    // Small delay for safety
     delay(200);
 }
 
@@ -68,15 +62,11 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     Serial.print(runLabel);
     Serial.println(")");
     
-    // Minimal preparation for painting sequence
     _prepareForPaintingSequence();
     
-    // The PaintingState now handles a dedicated pre-paint clean using CleaningState.
-
     Serial.print("Z axis at 0 (assumed or handled by pre-clean). Starting painting. (");
     Serial.print(runLabel);
     Serial.println(")");
-    // Note: Servo angle should be set by individual side patterns as needed.
     
     //! STEP 1: Paint left side (Side 4)
     Serial.print("Starting Left Side (Side 4) ("); Serial.print(runLabel); Serial.println(")");
@@ -117,16 +107,15 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
         Serial.println(")");
         PressurePot_ON();
         
-        // Replace blocking delay with non-blocking version that checks for home command
         unsigned long pressureStartTime = millis();
-        while (millis() - pressureStartTime < 1000) { // 1 second wait
+        while (millis() - pressureStartTime < 1000) {
             if (checkForHomeCommand()) {
                 Serial.print("All Sides Painting ABORTED (");
                 Serial.print(runLabel);
                 Serial.println(", during pressure pot pressurization)");
                 return false;
             }
-            delay(10); // Short delay between checks
+            delay(10);
         }
         
         Serial.print("Pressurization complete. (");
@@ -148,8 +137,8 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
 // Main function to be called externally
 void paintAllSides() {
     Serial.printf("Initiating All Sides Painting Process for %d coat(s).\n", g_requestedCoats);
-    int totalCoats = g_requestedCoats; // Capture the requested coats
-    g_requestedCoats = 1; // Reset global for next time, unless set again by command
+    int totalCoats = g_requestedCoats;
+    g_requestedCoats = 1; // Reset global for next time
 
     for (int coat = 1; coat <= totalCoats; ++coat) {
         char runLabel[10];
@@ -158,7 +147,7 @@ void paintAllSides() {
 
         if (!_executeSinglePaintAllSidesSequence(runLabel)) {
             Serial.printf("Painting %s aborted. Process terminated.\n", runLabel);
-            return; // Abort if the run was cancelled
+            return;
         }
 
         Serial.printf("%s finished.\n", runLabel);
@@ -168,10 +157,12 @@ void paintAllSides() {
             break; 
         }
 
-        // --- Inter-coat Delay and Loading Bar --- 
+        //! ************************************************************************
+        //! INTER-COAT DELAY AND LOADING BAR
+        //! ************************************************************************
         Serial.println("Preparing for inter-coat delay: Moving X to loading bar start position.");
         long target_x_start_loading_bar_steps = (long)(LOADING_BAR_X_START * STEPS_PER_INCH_XYZ);
-        stepperX->setSpeedInHz(DEFAULT_X_SPEED); // Use standard speed for this move
+        stepperX->setSpeedInHz(DEFAULT_X_SPEED);
         stepperX->setAcceleration(DEFAULT_X_ACCEL);
         stepperX->moveTo(target_x_start_loading_bar_steps);
         
@@ -185,43 +176,15 @@ void paintAllSides() {
         }
         Serial.println("Reached loading bar start position.");
 
-        // --- START: Custom servo and X-axis movement during inter-coat delay ---
-        // Serial.println("Inter-coat: Moving X to 5 inches from home.");
-        // long five_inches_from_home_steps = (long)(5.0f * STEPS_PER_INCH_XYZ);
-        // stepperX->moveTo(five_inches_from_home_steps);
-        // while (stepperX->isRunning()) {
-        //     if (checkForHomeCommand()) {
-        //         Serial.printf("Home command during X move to 5in before coat %d. Process terminated.\n", coat + 1);
-        //         stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-        //         return;
-        //     }
-        //     delay(1);
-        // }
-
-        // Serial.println("Inter-coat: Moving X to home (0 inches).");
-        // stepperX->moveTo(0); // Move to 0 (home)
-        // while (stepperX->isRunning()) {
-        //     if (checkForHomeCommand()) {
-        //         Serial.printf("Home command during X move to 0in before coat %d. Process terminated.\n", coat + 1);
-        //         stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-        //         return;
-        //     }
-        //     delay(1);
-        // }
-
-        // Serial.println("Inter-coat: Setting servo to 180 degrees.");
-        // myServo.setAngle(180);
-        // --- END: Custom servo and X-axis movement during inter-coat delay ---
-
         Serial.println("Starting X-axis loading bar movement for delay.");
         long target_x_end_loading_bar_steps = (long)(LOADING_BAR_X_END * STEPS_PER_INCH_XYZ);
-        float duration_seconds = (float)g_interCoatDelaySeconds; // NEW
-        long current_x_actual_start_steps = stepperX->getCurrentPosition(); // Should be LOADING_BAR_X_START
+        float duration_seconds = (float)g_interCoatDelaySeconds;
+        long current_x_actual_start_steps = stepperX->getCurrentPosition();
 
         if (duration_seconds < 0.1f) { 
             Serial.printf("Loading bar (%d) fallback: Simple timed wait for %d s.\n", coat, g_interCoatDelaySeconds);
             unsigned long simpleDelayStartTime = millis();
-            while (millis() - simpleDelayStartTime < (unsigned long)g_interCoatDelaySeconds * 1000) { // NEW
+            while (millis() - simpleDelayStartTime < (unsigned long)g_interCoatDelaySeconds * 1000) {
                 if (checkForHomeCommand()) {
                     Serial.printf("Home command during fallback wait (%d). Process terminated.\n", coat);
                     return;
@@ -250,81 +213,30 @@ void paintAllSides() {
             }
             Serial.printf("Loading bar movement (%d) complete.\n", coat);
         }
-        
-        // At the end of the delay (and loading bar movement), X is at LOADING_BAR_X_END.
-        // For the next coat, the painting sequence will begin.
-        // The _executeSinglePaintAllSidesSequence might require X to be at a specific starting point or 0.
-        // For now, we assume the individual paintSideXPattern functions handle their initial positioning from wherever X is.
-        // If they need X at 0,0, then a move to 0,0 (or at least X=0) should happen before the next call to _executeSinglePaintAllSidesSequence.
-        // The current _prepareForPaintingSequence in _executeSinglePaintAllSidesSequence does not move X/Y/Z.
-        // This is acceptable for now, individual patterns should manage their start.
 
         Serial.printf("Finished inter-coat delay for coat %d. Ready for coat %d.\n", coat, coat + 1);
     }
 
     Serial.println("All Sides Painting Process Fully Completed.");
 
-    //! Move to final resting position (3,3)
-    Serial.println("Moving to final resting position (X=3 inches, Y=3 inches).");
-    long target_x_final_steps = (long)(3.0f * STEPS_PER_INCH_XYZ);
-    long target_y_final_steps = (long)(3.0f * STEPS_PER_INCH_XYZ);
-
-    stepperX->setSpeedInHz(DEFAULT_X_SPEED);
-    stepperX->setAcceleration(DEFAULT_X_ACCEL);
-    stepperX->moveTo(target_x_final_steps);
-
-    stepperY_Left->setSpeedInHz(DEFAULT_Y_SPEED); // Assuming DEFAULT_Y_SPEED is defined
-    stepperY_Left->setAcceleration(DEFAULT_Y_ACCEL); // Assuming DEFAULT_Y_ACCEL is defined
-    stepperY_Left->moveTo(target_y_final_steps);
-
-    // Wait for X to complete
-    while (stepperX->isRunning()) {
-        if (checkForHomeCommand()) {
-            Serial.println("Home command received during final X move. Stopping.");
-            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-            if (stepperY_Left->isRunning()) { // Also stop Y if it's running
-                 stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
-            }
-            return; // Exit the function
-        }
-        delay(1);
-    }
-
-    // Wait for Y to complete
-    while (stepperY_Left->isRunning()) {
-        if (checkForHomeCommand()) {
-            Serial.println("Home command received during final Y move. Stopping.");
-            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
-            // X would have already stopped or completed
-            return; // Exit the function
-        }
-        delay(1);
-    }
-
-    Serial.println("Reached final resting position (X=3, Y=3).");
-
-    //! Reset rotation motor to 0 degrees
-    if (rotationStepper) {
-        Serial.println("Resetting rotation motor to 0 degrees.");
-        rotateToAngle(0); // Assuming this function is available from Rotation_Motor.h
-        
-        // Wait for rotation to complete
-        unsigned long rotationStartTime = millis();
-        while (rotationStepper->isRunning()) {
-            if (checkForHomeCommand()) {
-                Serial.println("Home command received during final rotation motor reset. Stopping.");
-                rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
-                return; // Exit the function
-            }
-            if (millis() - rotationStartTime > 15000) { // 15-second timeout for rotation
-                Serial.println("ERROR: Timeout resetting rotation motor!");
-                rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
-                return; // Exit the function
-            }
-            delay(1);
-        }
-        Serial.println("Rotation motor reset to 0 degrees.");
+    //! ************************************************************************
+    //! HOMING SEQUENCE
+    //! ************************************************************************
+    Serial.println("Initiating homing sequence using proper homing state...");
+    
+    if (stateMachine) {
+        // Change to homing state - this will properly home all axes including rotation
+        stateMachine->changeState(stateMachine->getHomingState());
+        Serial.println("Changed to homing state for proper axis positioning.");
     } else {
-        Serial.println("Rotation stepper not available, skipping reset to 0 degrees.");
+        Serial.println("ERROR: StateMachine not available for homing. Performing basic cleanup.");
+        
+        // Fallback: Stop all motors if state machine is not available
+        if (stepperX->isRunning()) stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        if (stepperY_Left->isRunning()) stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        if (rotationStepper && rotationStepper->isRunning()) {
+            rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
+        }
     }
 } 

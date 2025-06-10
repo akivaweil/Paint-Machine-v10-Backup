@@ -81,16 +81,26 @@ bool Homing::homeAllAxes() {
         rotationStepper->setAcceleration(DEFAULT_ROT_ACCEL / 2); //? Half acceleration for homing
     }
     
-    //! STEP 4: Start motors moving toward home switches, if not already there
-    Serial.println("Moving all axes toward home switches (if not already at switch)...");
+    //! STEP 4: Perform rotation homing first (if rotation motor exists)
+    bool rotationActuallyHomed = false; // Flag to indicate if rotation homing was attempted and completed
+    
+    // Perform rotation homing first if stepper exists
+    if (rotationStepper) {
+        Serial.println("Starting rotation homing to 0 degrees (shortest path)...");
+        rotateToAngle(0); // This is BLOCKING and uses shortest path logic.
+        rotationStepper->setCurrentPosition(0); // Explicitly set logical position to 0 steps
+        Serial.println("Rotation axis homed and moved to 0 degrees.");
+        rotationActuallyHomed = true;
+    }
+    
+    //! STEP 5: Start X, Y, Z motors moving toward home switches (after rotation homing)
+    Serial.println("Moving X, Y, Z axes toward home switches (if not already at switch)...");
 
     // Initialize homing status flags (ensure they are defined before this block)
     bool xHomed = false;
     bool yLeftHomed = false;
     bool yRightHomed = false;
     bool zHomed = false;
-    // rotationActuallyHomed will be set later
-    // rotationHomed will be evaluated later
 
     _xHomeSwitch.update(); // Initial read before moving
     if (_xHomeSwitch.read() != HIGH) {
@@ -140,16 +150,6 @@ bool Homing::homeAllAxes() {
         _stepperZ->setCurrentPosition(0);
         zHomed = true;
     }
-    
-    //? Rotation homing is handled differently now to ensure shortest path and blocking execution
-    //? It will be performed sequentially before the main polling loop for X, Y, Z.
-    
-    //! STEP 5: Track homing status for each motor (already declared and partially set above)
-    // bool xHomed = false; // MOVED UP
-    // bool yLeftHomed = false; // MOVED UP
-    // bool yRightHomed = false;  // MOVED UP
-    // bool zHomed = false; // MOVED UP
-    bool rotationActuallyHomed = false; // Flag to indicate if rotation homing was attempted and completed
     
     bool rotationHomed = (rotationStepper == NULL) || rotationActuallyHomed; // True if no stepper or if homing completed
     
@@ -299,8 +299,7 @@ bool Homing::homeAllAxes() {
     _stepperY_Left->setCurrentPosition(0);
     _stepperY_Right->setCurrentPosition(0);
     _stepperZ->setCurrentPosition(0);
-    //? Rotation already set to 0 earlier if it exists and was homed.
-    //? If rotationStepper exists, its position was already set by rotationStepper->setCurrentPosition(0) after rotateToAngle(0).
+    //? Rotation motor was physically moved to 0 degrees and logical position set to 0 earlier if it exists.
     
     //! STEP 11: Homing completed successfully
     Serial.println("Homing sequence completed successfully.");
