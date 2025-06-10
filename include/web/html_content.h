@@ -1000,8 +1000,15 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
                 
                 // Handle status messages
                 else if (messageText.startsWith('STATUS:')) {
-                    console.log('Status message: ' + messageText.substring(7));
-                    // Could add notification display here
+                    const status = messageText.substring(7);
+                    console.log('Status message: ' + status);
+                    
+                    // Handle pause/resume status
+                    if (status === 'PAUSED') {
+                        updatePauseButtonState(true);
+                    } else if (status === 'RESUMED') {
+                        updatePauseButtonState(false);
+                    }
                 }
             }
         }
@@ -1012,55 +1019,101 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
             
             // Determine if machine is in IDLE state
             const isIdle = (stateName === 'IDLE');
-            // const canPerformActions = (stateName === 'IDLE' || stateName === 'PNP'); // Keep for other buttons if needed
-
-            // Get other button elements (paint, home, clean, pnp start)
-            const paintSide1Btn = document.getElementById('paintSide1Btn');
-            const paintSide2Btn = document.getElementById('paintSide2Btn');
-            const paintSide3Btn = document.getElementById('paintSide3Btn');
-            const paintSide4Btn = document.getElementById('paintSide4Btn');
-            const paintAllSidesBtn = document.getElementById('paintAllSidesBtn');
-            const paintMultipleCoatsBtn = document.getElementById('paintMultipleCoatsBtn'); // Added
-            const homeBtn = document.getElementById('homeBtn');
-            const cleanGunBtn = document.getElementById('cleanGunBtn');
-            const pnpButton = document.getElementById('pnpButton'); // Assuming this is the start PnP button
-            // const pressurePotToggle = document.getElementById('pressurePotToggle'); // Toggles are handled separately or always on
-            // const paintGunToggle = document.getElementById('paintGunToggle');
-
-            // General action buttons (Painting, Homing, Cleaning, PnP Start)
-            // Typically enabled only when IDLE. Adjust if PNP also allows some of these.
-            const canPerformGeneralActions = isIdle || (stateName === 'PNP'); // Or simply use isIdle if PNP mode blocks these too
-
-            if (paintSide1Btn) paintSide1Btn.disabled = !isIdle; // Only from IDLE
-            if (paintSide2Btn) paintSide2Btn.disabled = !isIdle; // Only from IDLE
-            if (paintSide3Btn) paintSide3Btn.disabled = !isIdle; // Only from IDLE
-            if (paintSide4Btn) paintSide4Btn.disabled = !isIdle; // Only from IDLE
-            if (paintAllSidesBtn) paintAllSidesBtn.disabled = !isIdle; // Only from IDLE
-            if (paintMultipleCoatsBtn) paintMultipleCoatsBtn.disabled = !isIdle; // Only from IDLE
-            if (homeBtn) homeBtn.disabled = !isIdle && !(stateName === 'ERROR'); // Allow homing from IDLE or ERROR state
-            if (cleanGunBtn) cleanGunBtn.disabled = !isIdle; // Only from IDLE
-            if (pnpButton) pnpButton.disabled = !isIdle; // Only from IDLE to start PnP cycle
-
-            // Manual Control Elements
-            const manualXInput = document.getElementById('manualX');
-            const manualYInput = document.getElementById('manualY');
-            const manualZInput = document.getElementById('manualZ');
-            const manualAngleInput = document.getElementById('manualAngle');
-            const manualMoveBtn = document.getElementById('manualMoveToBtn');
-            const manualRotateCWBtn = document.getElementById('manualRotateCwBtn');
-            const manualRotateCCWBtn = document.getElementById('manualRotateCcwBtn');
-
-            // Enable manual controls and inputs only if IDLE
-            if (manualXInput) manualXInput.disabled = !isIdle;
-            if (manualYInput) manualYInput.disabled = !isIdle;
-            if (manualZInput) manualZInput.disabled = !isIdle;
-            if (manualAngleInput) manualAngleInput.disabled = !isIdle;
-            if (manualMoveBtn) manualMoveBtn.disabled = !isIdle;
-            if (manualRotateCWBtn) manualRotateCWBtn.disabled = !isIdle;
-            if (manualRotateCCWBtn) manualRotateCCWBtn.disabled = !isIdle;
+            const isPainting = (stateName === 'PAINTING');
+            const isCleaning = (stateName === 'CLEANING');
             
-            // The enterManualModeBtn and exitManualModeBtn elements will be removed from HTML
-            // So, no need to get or disable them here anymore.
+            // Get the main controls container and pause container
+            const mainControlsContainer = document.querySelector('.top-controls-container');
+            const patternSettingsContainer = document.querySelector('.pattern-settings-container');
+            const manualControlSection = document.getElementById('manualControlSection');
+            const pnpSettingsContainer = document.querySelector('.pattern-settings-container:last-of-type');
+            
+            // Create pause container if it doesn't exist
+            let pauseContainer = document.getElementById('pauseContainer');
+            if (!pauseContainer) {
+                pauseContainer = document.createElement('div');
+                pauseContainer.id = 'pauseContainer';
+                pauseContainer.className = 'top-controls-container';
+                pauseContainer.style.display = 'none';
+                pauseContainer.innerHTML = `
+                    <div class="integrated-main-card main-card" style="text-align: center;">
+                        <h2 style="color: #fbc02d; margin-bottom: 20px;">Machine is Painting</h2>
+                        <button id="pauseBtn" class="main-btn" style="background: linear-gradient(90deg, #fbc02d 60%, #f9a825 100%); font-size: 1.2rem; padding: 16px 32px;" onclick="togglePause()">
+                            <span class="btn-icon" aria-hidden="true">
+                                <svg id="pauseIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M6 4H10V20H6V4Z" fill="currentColor"/>
+                                    <path d="M14 4H18V20H14V4Z" fill="currentColor"/>
+                                </svg>
+                                <svg id="resumeIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                                    <path d="M8 5V19L19 12L8 5Z" fill="currentColor"/>
+                                </svg>
+                            </span>
+                            <span id="pauseBtnLabel" class="btn-label">PAUSE</span>
+                        </button>
+                    </div>
+                `;
+                // Insert pause container before the main controls container
+                mainControlsContainer.parentNode.insertBefore(pauseContainer, mainControlsContainer);
+            }
+            
+            // Show/hide containers based on painting state
+            if (isPainting || isCleaning) {
+                // Hide all normal controls
+                if (mainControlsContainer) mainControlsContainer.style.display = 'none';
+                if (patternSettingsContainer) patternSettingsContainer.style.display = 'none';
+                if (manualControlSection) manualControlSection.style.display = 'none';
+                if (pnpSettingsContainer) pnpSettingsContainer.style.display = 'none';
+                
+                // Show pause container
+                if (pauseContainer) pauseContainer.style.display = 'flex';
+            } else {
+                // Show all normal controls
+                if (mainControlsContainer) mainControlsContainer.style.display = 'flex';
+                if (patternSettingsContainer) patternSettingsContainer.style.display = 'block';
+                if (manualControlSection) manualControlSection.style.display = 'block';
+                if (pnpSettingsContainer) pnpSettingsContainer.style.display = 'block';
+                
+                // Hide pause container
+                if (pauseContainer) pauseContainer.style.display = 'none';
+                
+                // Update normal button states when not painting
+                const paintSide1Btn = document.getElementById('paintSide1Btn');
+                const paintSide2Btn = document.getElementById('paintSide2Btn');
+                const paintSide3Btn = document.getElementById('paintSide3Btn');
+                const paintSide4Btn = document.getElementById('paintSide4Btn');
+                const paintAllSidesBtn = document.getElementById('paintAllSidesBtn');
+                const paintMultipleCoatsBtn = document.getElementById('paintMultipleCoatsBtn');
+                const homeBtn = document.getElementById('homeBtn');
+                const cleanGunBtn = document.getElementById('cleanGunBtn');
+                const pnpButton = document.getElementById('pnpButton');
+
+                if (paintSide1Btn) paintSide1Btn.disabled = !isIdle;
+                if (paintSide2Btn) paintSide2Btn.disabled = !isIdle;
+                if (paintSide3Btn) paintSide3Btn.disabled = !isIdle;
+                if (paintSide4Btn) paintSide4Btn.disabled = !isIdle;
+                if (paintAllSidesBtn) paintAllSidesBtn.disabled = !isIdle;
+                if (paintMultipleCoatsBtn) paintMultipleCoatsBtn.disabled = !isIdle;
+                if (homeBtn) homeBtn.disabled = !isIdle && !(stateName === 'ERROR');
+                if (cleanGunBtn) cleanGunBtn.disabled = !isIdle;
+                if (pnpButton) pnpButton.disabled = !isIdle;
+
+                // Manual Control Elements
+                const manualXInput = document.getElementById('manualX');
+                const manualYInput = document.getElementById('manualY');
+                const manualZInput = document.getElementById('manualZ');
+                const manualAngleInput = document.getElementById('manualAngle');
+                const manualMoveBtn = document.getElementById('manualMoveToBtn');
+                const manualRotateCWBtn = document.getElementById('manualRotateCwBtn');
+                const manualRotateCCWBtn = document.getElementById('manualRotateCcwBtn');
+
+                if (manualXInput) manualXInput.disabled = !isIdle;
+                if (manualYInput) manualYInput.disabled = !isIdle;
+                if (manualZInput) manualZInput.disabled = !isIdle;
+                if (manualAngleInput) manualAngleInput.disabled = !isIdle;
+                if (manualMoveBtn) manualMoveBtn.disabled = !isIdle;
+                if (manualRotateCWBtn) manualRotateCWBtn.disabled = !isIdle;
+                if (manualRotateCCWBtn) manualRotateCCWBtn.disabled = !isIdle;
+            }
         }
 
         // Send commands to the ESP32
@@ -1146,6 +1199,51 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
             
             // Debug toggle state
             console.log(`Toggle Paint Gun: ${enabled ? 'ON' : 'OFF'}, checked=${toggle.checked}`);
+        }
+        
+        // Toggle Pause/Resume
+        function togglePause() {
+            const pauseBtn = document.getElementById('pauseBtn');
+            const pauseIcon = document.getElementById('pauseIcon');
+            const resumeIcon = document.getElementById('resumeIcon');
+            const pauseBtnLabel = document.getElementById('pauseBtnLabel');
+            
+            // Check current state based on button text
+            const isPaused = pauseBtnLabel.textContent === 'RESUME';
+            
+            if (isPaused) {
+                // Currently paused, send resume command
+                sendCommand('RESUME');
+            } else {
+                // Currently running, send pause command
+                sendCommand('PAUSE');
+            }
+        }
+        
+        // Update pause button state based on machine state
+        function updatePauseButtonState(isPaused) {
+            const pauseBtn = document.getElementById('pauseBtn');
+            const pauseIcon = document.getElementById('pauseIcon');
+            const resumeIcon = document.getElementById('resumeIcon');
+            const pauseBtnLabel = document.getElementById('pauseBtnLabel');
+            
+            if (!pauseBtn || !pauseIcon || !resumeIcon || !pauseBtnLabel) {
+                return; // Elements not found
+            }
+            
+            if (isPaused) {
+                // Machine is paused - show resume button
+                pauseIcon.style.display = 'none';
+                resumeIcon.style.display = 'inline-block';
+                pauseBtnLabel.textContent = 'RESUME';
+                pauseBtn.style.background = 'linear-gradient(90deg, #4CAF50 60%, #388E3C 100%)';
+            } else {
+                // Machine is running - show pause button
+                pauseIcon.style.display = 'inline-block';
+                resumeIcon.style.display = 'none';
+                pauseBtnLabel.textContent = 'PAUSE';
+                pauseBtn.style.background = 'linear-gradient(90deg, #fbc02d 60%, #f9a825 100%)';
+            }
         }
 
         // Handle Pattern Tab Navigation
