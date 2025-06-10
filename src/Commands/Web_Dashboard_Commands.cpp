@@ -27,6 +27,7 @@
 #include "settings/motion.h" // Include for default PNP values
 #include "states/CleaningState.h" // Include for setShortMode
 #include <limits.h> // ADDED For LONG_MIN, INT_MIN
+#include "system/GlobalState.h" // ADDED for isPaused and isActivePainting
 
 // --- PNP Settings Keys for NVS ---
 #define PNP_X_SPEED_KEY "pnpXSpd"
@@ -400,32 +401,48 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     }
     else if (baseCommandAction == "PAINT_SIDE_1") {
         Serial.println("Painting side 1...");
+        isActivePainting = true;
+        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide1Pattern(); // Call the function directly
+        isActivePainting = false;
+        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 1 initiated.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 1 completed.");
         // Transition to Homing state should be handled by the PaintingState or user interaction
     }
     else if (baseCommandAction == "PAINT_SIDE_2") {
         Serial.println("Painting side 2...");
+        isActivePainting = true;
+        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide2Pattern(); // Call directly
+        isActivePainting = false;
+        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 2 initiated.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 2 completed.");
     }
     else if (baseCommandAction == "PAINT_SIDE_3") {
         Serial.println("Painting side 3...");
+        isActivePainting = true;
+        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide3Pattern(); // Call directly
+        isActivePainting = false;
+        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 3 initiated.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 3 completed.");
     }
     else if (baseCommandAction == "PAINT_SIDE_4") {
         Serial.println("Painting side 4...");
+        isActivePainting = true;
+        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide4Pattern(); // Call directly
+        isActivePainting = false;
+        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 4 initiated.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 4 completed.");
     }
     else if (baseCommandAction == "PAINT_ALL_SIDES") {
         Serial.println("Painting all sides (single coat request)...");

@@ -1019,7 +1019,7 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
             
             // Determine if machine is in IDLE state
             const isIdle = (stateName === 'IDLE');
-            const isPainting = (stateName === 'PAINTING');
+            const isPainting = (stateName === 'PAINTING' || stateName === 'PAINTING_INDIVIDUAL');
             const isCleaning = (stateName === 'CLEANING');
             
             // Get the main controls container and pause container

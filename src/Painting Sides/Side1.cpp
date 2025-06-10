@@ -16,6 +16,7 @@
 // External references to stepper motors
 extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
+extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 extern ServoMotor myServo; // Declare external servo instance
 extern PaintingSettings paintingSettings; // Make sure global instance is accessible
@@ -108,29 +109,62 @@ bool paintSide1Pattern() {
     long ySpeed = paintingSettings.getSide1PaintingYSpeed(); // Use getter for Y speed (though Y isn't moving)
     long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 
-    Serial.println("Side 1 Pattern: Performing single X shift with 0.25in paint offsets");
+    Serial.println("Side 1 Pattern: Performing single X shift with smooth paint gun control");
 
-    // Move 0.25 inches without paint gun
-    long startPaintX = currentX + paintOffsetSteps;
-    moveToXYZ(startPaintX, xSpeed, currentY, ySpeed, zPos, DEFAULT_Z_SPEED);
-    currentX = startPaintX;
+    // Calculate timing for paint gun control during smooth movement
+    long finalX = startX + shiftXDistance;
+    float totalDistance = (float)shiftXDistance / STEPS_PER_INCH_XYZ; // Distance in inches
+    float paintOnDistance = totalDistance - 0.5f; // Paint distance (total minus 0.5 inches)
     
-    paintGun_ON();
-    Serial.println("Paint gun ON after 0.25in offset");
-
-    // Calculate the X position to turn off the paint gun (0.25 inches before end)
-    long endPaintX = startX + shiftXDistance - paintOffsetSteps;
+    // Calculate timing based on speed (steps per second)
+    float timeToStart = 0.25f * 60.0f / ((float)xSpeed / STEPS_PER_INCH_XYZ); // Time to travel 0.25 inches
+    float timeToStop = paintOnDistance * 60.0f / ((float)xSpeed / STEPS_PER_INCH_XYZ); // Time when paint should stop
     
-    // Move with paint gun ON
-    moveToXYZ(endPaintX, xSpeed, currentY, ySpeed, zPos, DEFAULT_Z_SPEED);
-    currentX = endPaintX;
+    // Start the smooth movement
+    unsigned long moveStartTime = millis();
     
-    paintGun_OFF(); // Turn off gun
-    Serial.println("Paint gun OFF, 0.25in before end. Completing travel.");
-
-    // Complete the remaining 0.25 inches with paint gun OFF
-    long finalX = startX + shiftXDistance; // Final target X position
-    moveToXYZ(finalX, xSpeed, currentY, ySpeed, zPos, DEFAULT_Z_SPEED); 
+    // Begin continuous movement to final position
+    stepperX->moveTo(finalX);
+    stepperX->setSpeedInHz(xSpeed);
+    
+    bool paintGunActivated = false;
+    bool paintGunDeactivated = false;
+    
+    // Monitor movement and control paint gun at precise timing
+    while(stepperX->isRunning()) {
+        unsigned long currentTime = millis();
+        float elapsedSeconds = (currentTime - moveStartTime) / 1000.0f;
+        
+        // Turn paint gun ON after 0.25 inches (based on time)
+        if (!paintGunActivated && elapsedSeconds >= (timeToStart / 1000.0f)) {
+            paintGun_ON();
+            paintGunActivated = true;
+            Serial.println("Paint gun ON - smooth motion");
+        }
+        
+        // Turn paint gun OFF 0.25 inches before end (based on time)  
+        if (paintGunActivated && !paintGunDeactivated && elapsedSeconds >= (timeToStop / 1000.0f)) {
+            paintGun_OFF();
+            paintGunDeactivated = true;
+            Serial.println("Paint gun OFF - smooth motion continues");
+        }
+        
+        // Check for home command during movement
+        if (checkForHomeCommand()) {
+            stepperX->forceStop();
+            paintGun_OFF();
+            Serial.println("Side 1 Pattern Painting ABORTED due to home command during movement");
+            return false;
+        }
+        
+        delay(1); // Small delay to prevent excessive CPU usage
+    }
+    
+    // Ensure paint gun is off at the end
+    paintGun_OFF();
+    
+    // Update current position
+    currentX = finalX; 
 
     // Check for home command after the single move
     if (checkForHomeCommand()) {
