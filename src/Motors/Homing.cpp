@@ -334,7 +334,7 @@ bool Homing::homeAllAxes() {
         //! STEP 12: Move to position 0,32 after successful homing
         Serial.println("Moving to position 0,32 after homing...");
         long targetX_steps = 0; // X position 0 inches
-        long targetY_steps = (long)(32.0f * STEPS_PER_INCH_XYZ); // Y position 32 inches
+        long targetY_steps = (long)(0.3f * STEPS_PER_INCH_XYZ); // Y position 32 inches
         long targetZ_steps = 0; // Z position 0 inches (home position)
         
         // Set speeds for the move to position 0,32
@@ -362,7 +362,7 @@ bool Homing::homeAllAxes() {
         
         // clearMachineState(); // REMOVED - StateMachine handles transition
     } else {
-3333        Serial.println("Homing failed for one or more physical axes (X,Y,Z).");
+        Serial.println("Homing failed for one or more physical axes (X,Y,Z).");
         // setMachineState(MachineState::ERROR); // REMOVED - StateMachine handles transition/error reporting
     }
     return allPhysicalAxesHomed; // Return status of X,Y,Z. Rotation is best-effort or assumed done.

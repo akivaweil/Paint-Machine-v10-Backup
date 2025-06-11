@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "utils/settings.h" // Likely needed for pin definitions, steps/mm, etc.
 #include "settings/debounce_settings.h" // Added for centralized debounce intervals
+#include "settings/motion.h" // Added for DEFAULT speeds and STEPS_PER_INCH_XYZ
 
 // Include motor control library
 #include <FastAccelStepper.h>
@@ -182,5 +183,22 @@ void checkMotors() {
         // Take action like stopping Z motor
         // stepperZ->forceStop(); // Example action
     }
+}
+
+//! ************************************************************************
+//! HELPER FUNCTION TO MOVE TO POSITION (1,1,0) BEFORE HOMING
+//! ************************************************************************
+void moveToPositionOneOneBeforeHoming() {
+    Serial.println("Moving to position (1,1,0) before homing...");
+    
+    // Convert inches to steps
+    long xPos = (long)(1.0 * STEPS_PER_INCH_XYZ);
+    long yPos = (long)(1.0 * STEPS_PER_INCH_XYZ);
+    long zPos = 0; // Z position 0 inches (home position)
+    
+    // Move to position (1,1,0)
+    moveToXYZ(xPos, DEFAULT_X_SPEED, yPos, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
+    
+    Serial.println("Reached position (1,1,0). Ready for homing.");
 }
 

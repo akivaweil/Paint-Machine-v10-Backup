@@ -101,12 +101,15 @@ bool paintSide1Pattern() {
         Serial.println("Paint gun OFF - movement complete");
     }
 
-    //! Raise to safe Z height
+    //! STEP 6: Raise to safe Z height (Was STEP 8)
     moveToXYZ(finalX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
 
-    //! Transition back to Homing State
+    //! Move to position (1,1,0) before homing
+    moveToPositionOneOneBeforeHoming();
+
+    //! Stage 5: Transition back to Homing State after completion
     Serial.println("Side 1 painting complete. Transitioning to Homing State...");
-    stateMachine->changeState(stateMachine->getHomingState());
+    stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call
 
     return true;
 }

@@ -313,7 +313,10 @@ void paintSide4Pattern() {
     
     paintGun_OFF();
 
-    //! Transition to Homing State immediately after final X movement
+    //! Move to position (1,1,0) before homing
+    moveToPositionOneOneBeforeHoming();
+
+    //! Transition to Homing State
     Serial.println("Side 4 painting complete. Transitioning to Homing State...");
     stateMachine->changeState(stateMachine->getHomingState());
 }

@@ -308,6 +308,9 @@ void paintSide2Pattern() {
     // Move Z to safe height
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
 
+    //! Move to position (1,1,0) before homing
+    moveToPositionOneOneBeforeHoming();
+
     //! Transition to Homing State
     Serial.println("Side 2 painting complete. Transitioning to Homing State...");
     stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call

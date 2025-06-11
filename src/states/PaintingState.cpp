@@ -71,14 +71,14 @@ void PaintingState::update() {
             break;
 
         case PS_MOVE_TO_POSITION_BEFORE_HOMING:
-            Serial.println("PaintingState: Moving to position (3,3,0) before Homing.");
+            Serial.println("PaintingState: Moving to position (1,1,0) before Homing.");
             // Convert inches to steps
-            xPos = (long)(3.0 * STEPS_PER_INCH_XYZ);
-            yPos = (long)(3.0 * STEPS_PER_INCH_XYZ);
+            xPos = (long)(1.0 * STEPS_PER_INCH_XYZ);
+            yPos = (long)(1.0 * STEPS_PER_INCH_XYZ);
             zPos = 0;
             
             moveToXYZ(xPos, DEFAULT_X_SPEED, yPos, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED); // Blocking
-            Serial.println("PaintingState: Reached position (3,3,0).");
+            Serial.println("PaintingState: Reached position (1,1,0).");
             currentStep = PS_REQUEST_HOMING;
             // Fall through intentionally to PS_REQUEST_HOMING
         
