@@ -71,7 +71,7 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     //! STEP 1: Paint left side (Side 4)
     Serial.print("Starting Left Side (Side 4) ("); Serial.print(runLabel); Serial.println(")");
     paintSide4Pattern();
-    if (checkForHomeCommand()) {
+    if (checkForPauseCommand()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after left side)");
         return false;
     }
@@ -79,7 +79,7 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     //! STEP 2: Paint back side (Side 3)
     Serial.print("Starting Back Side (Side 3) ("); Serial.print(runLabel); Serial.println(")");
     paintSide3Pattern();
-    if (checkForHomeCommand()) {
+    if (checkForPauseCommand()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after back side)");
         return false;
     }
@@ -87,7 +87,7 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     //! STEP 3: Paint right side (Side 2)
     Serial.print("Starting Right Side (Side 2) ("); Serial.print(runLabel); Serial.println(")");
     paintSide2Pattern();
-    if (checkForHomeCommand()) {
+    if (checkForPauseCommand()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after right side)");
         return false;
     }
@@ -95,7 +95,7 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     //! STEP 4: Paint front side (Side 1)
     Serial.print("Starting Front Side (Side 1) ("); Serial.print(runLabel); Serial.println(")");
     paintSide1Pattern();
-    if (checkForHomeCommand()) {
+    if (checkForPauseCommand()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after front side)");
         return false;
     }
@@ -109,7 +109,7 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
         
         unsigned long pressureStartTime = millis();
         while (millis() - pressureStartTime < 1000) {
-            if (checkForHomeCommand()) {
+            if (checkForPauseCommand()) {
                 Serial.print("All Sides Painting ABORTED (");
                 Serial.print(runLabel);
                 Serial.println(", during pressure pot pressurization)");
@@ -167,7 +167,7 @@ void paintAllSides() {
         stepperX->moveTo(target_x_start_loading_bar_steps);
         
         while (stepperX->isRunning()) {
-            if (checkForHomeCommand()) {
+            if (checkForPauseCommand()) {
                 Serial.printf("Home command during move to loading bar start before coat %d. Process terminated.\n", coat + 1);
                 stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
                 return;
@@ -185,7 +185,7 @@ void paintAllSides() {
             Serial.printf("Loading bar (%d) fallback: Simple timed wait for %d s.\n", coat, g_interCoatDelaySeconds);
             unsigned long simpleDelayStartTime = millis();
             while (millis() - simpleDelayStartTime < (unsigned long)g_interCoatDelaySeconds * 1000) {
-                if (checkForHomeCommand()) {
+                if (checkForPauseCommand()) {
                     Serial.printf("Home command during fallback wait (%d). Process terminated.\n", coat);
                     return;
                 }
@@ -204,7 +204,7 @@ void paintAllSides() {
             stepperX->moveTo(target_x_end_loading_bar_steps);
 
             while (stepperX->isRunning()) {
-                if (checkForHomeCommand()) {
+                if (checkForPauseCommand()) {
                     Serial.printf("Home command during loading bar (%d). Process terminated.\n", coat);
                     stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
                     return;

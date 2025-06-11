@@ -33,8 +33,8 @@ bool paintSide1Pattern() {
     //! Load Servo Angle
     int servoAngle = paintingSettings.getServoAngleSide1(); // NEW WAY: Use getter
 
-    // Check for home command before starting
-    if (checkForHomeCommand()) {
+    // Check for home/pause commands before starting
+    if (checkForPauseCommand()) {
         Serial.println("Side 1 Pattern Painting ABORTED due to home command (before starting)");
         return false;
     }
@@ -46,8 +46,8 @@ bool paintSide1Pattern() {
     //! STEP 0: Turn on pressure pot
     PressurePot_ON();
     
-    // Check for home command after servo and pressure
-    if (checkForHomeCommand()) {
+    // Check for home/pause commands after servo and pressure
+    if (checkForPauseCommand()) {
         Serial.println("Side 1 Pattern Painting ABORTED due to home command (after prep)");
         return false;
     }
@@ -62,8 +62,8 @@ bool paintSide1Pattern() {
               stepperY_Left->getCurrentPosition(), DEFAULT_Y_SPEED,
               sideZPos, DEFAULT_Z_SPEED);
               
-    // Check for home command after Z move
-    if (checkForHomeCommand()) {
+    // Check for home/pause commands after Z move
+    if (checkForPauseCommand()) {
         Serial.println("Side 1 Pattern Painting ABORTED due to home command (after initial Z)");
         return false;
     }
@@ -72,8 +72,8 @@ bool paintSide1Pattern() {
     rotateToAngle(SIDE1_ROTATION_ANGLE); // Speed likely handled within rotateToAngle
     Serial.println("Rotated to side 1 position");
     
-    // Check for home command after rotation
-    if (checkForHomeCommand()) {
+    // Check for home/pause commands after rotation
+    if (checkForPauseCommand()) {
         Serial.println("Side 1 Pattern Painting ABORTED due to home command (after rotation)");
         return false;
     }
@@ -84,8 +84,8 @@ bool paintSide1Pattern() {
     moveToXYZ(startX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
     Serial.println("Moved to side 1 pattern start position (P2)");
     
-    // Check for home command after move to start
-    if (checkForHomeCommand()) {
+    // Check for home/pause commands after move to start
+    if (checkForPauseCommand()) {
         Serial.println("Side 1 Pattern Painting ABORTED due to home command (after move to start)");
         return false;
     }
@@ -93,8 +93,8 @@ bool paintSide1Pattern() {
     //! STEP 4: Lower to painting Z height
     moveToXYZ(startX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
     
-    // Check for home command after Z lower
-    if (checkForHomeCommand()) {
+    // Check for home/pause commands after Z lower
+    if (checkForPauseCommand()) {
         // Raise to safe Z height before aborting
         moveToXYZ(startX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
         Serial.println("Side 1 Pattern Painting ABORTED due to home command (after Z lower)");
@@ -149,8 +149,8 @@ bool paintSide1Pattern() {
             Serial.println("Paint gun OFF - smooth motion continues");
         }
         
-        // Check for home command during movement
-        if (checkForHomeCommand()) {
+        // Check for home/pause commands during movement
+        if (checkForPauseCommand()) {
             stepperX->forceStop();
             paintGun_OFF();
             Serial.println("Side 1 Pattern Painting ABORTED due to home command during movement");
@@ -166,8 +166,8 @@ bool paintSide1Pattern() {
     // Update current position
     currentX = finalX; 
 
-    // Check for home command after the single move
-    if (checkForHomeCommand()) {
+    // Check for home/pause commands after the single move
+    if (checkForPauseCommand()) {
         // Raise to safe Z height before aborting
         moveToXYZ(finalX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
         Serial.println("Side 1 Pattern Painting ABORTED due to home command (after painting)");

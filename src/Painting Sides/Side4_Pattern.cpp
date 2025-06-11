@@ -87,17 +87,30 @@ void paintSide4Pattern() {
         }
 
         if (isPositiveYSweep) {
-            Serial.printf("Side 4 Pattern: Sweep %d (+Y) with smooth paint gun control\\\n", i + 1);
+            Serial.printf("Side 4 Pattern: Sweep %d (+Y) - Moving to end position first, then painting backwards\\\n", i + 1);
             
+            // First: Move to final position without painting
             long finalY = currentY + sweepYDistance;
+            moveToXYZ(currentX, DEFAULT_X_SPEED, finalY, current_paint_y_speed, zPos, DEFAULT_Z_SPEED);
+            
+            if (checkForPauseCommand()) {
+                stepperY_Left->forceStop();
+                stepperY_Right->forceStop();
+                paintGun_OFF();
+                Serial.println("Side 4 Pattern Painting ABORTED due to home command");
+                return;
+            }
+            
+            // Second: Paint while moving back to original position (-Y direction)
             float totalDistance = (float)sweepYDistance / STEPS_PER_INCH_XYZ;
             float timeToStart = 0.25f * 60.0f / ((float)current_paint_y_speed / STEPS_PER_INCH_XYZ);
             float timeToStop = (totalDistance - 0.5f) * 60.0f / ((float)current_paint_y_speed / STEPS_PER_INCH_XYZ);
             
+            // Start smooth movement back to original Y
             unsigned long moveStartTime = millis();
-            stepperY_Left->moveTo(finalY);
+            stepperY_Left->moveTo(currentY);
             stepperY_Left->setSpeedInHz(current_paint_y_speed);
-            stepperY_Right->moveTo(finalY);
+            stepperY_Right->moveTo(currentY);
             stepperY_Right->setSpeedInHz(current_paint_y_speed);
             
             bool paintGunActivated = false;
@@ -117,7 +130,7 @@ void paintSide4Pattern() {
                     paintGunDeactivated = true;
                 }
                 
-                if (checkForHomeCommand()) {
+                if (checkForPauseCommand()) {
                     stepperY_Left->forceStop();
                     stepperY_Right->forceStop();
                     paintGun_OFF();
@@ -128,7 +141,7 @@ void paintSide4Pattern() {
             }
             
             paintGun_OFF();
-            currentY = finalY;
+            // currentY remains the same as we moved back to original position
         } else {
             Serial.printf("Side 4 Pattern: Sweep %d (-Y) with smooth paint gun control\\\n", i + 1);
             
@@ -160,7 +173,7 @@ void paintSide4Pattern() {
                     paintGunDeactivated = true;
                 }
                 
-                if (checkForHomeCommand()) {
+                if (checkForPauseCommand()) {
                     stepperY_Left->forceStop();
                     stepperY_Right->forceStop();
                     paintGun_OFF();
@@ -174,7 +187,7 @@ void paintSide4Pattern() {
             currentY = finalY;
         }
 
-        if (checkForHomeCommand()) {
+        if (checkForPauseCommand()) {
             moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
             Serial.println("Side 4 Pattern Painting ABORTED due to home command");
             return;
@@ -186,7 +199,7 @@ void paintSide4Pattern() {
             currentX += shiftXDistance; // Shift in +X direction (ensure shiftXDistance is positive in settings for +X)
             moveToXYZ(currentX, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED); // Use original paint_y_speed for X shift
             
-            if (checkForHomeCommand()) {
+            if (checkForPauseCommand()) {
                  moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
                  Serial.println("Side 4 Pattern Painting ABORTED due to home command during X shift");
                  return;
@@ -207,7 +220,7 @@ void paintSide4Pattern() {
     moveToXYZ(currentX, paint_x_speed, endSeq_targetY1, paint_y_speed, zPos, DEFAULT_Z_SPEED); // Maintain painting Z
     currentY = endSeq_targetY1;
 
-    if (checkForHomeCommand()) {
+    if (checkForPauseCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
         Serial.println("Side 4 Pattern Painting ABORTED during end sequence (move 1) due to home command");
         return;
@@ -219,7 +232,7 @@ void paintSide4Pattern() {
     moveToXYZ(endSeq_targetX1, paint_x_speed, currentY, paint_y_speed, zPos, DEFAULT_Z_SPEED); // Maintain painting Z
     currentX = endSeq_targetX1;
 
-    if (checkForHomeCommand()) {
+    if (checkForPauseCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
         Serial.println("Side 4 Pattern Painting ABORTED during end sequence (move 2) due to home command");
         return;
@@ -265,7 +278,7 @@ void paintSide4Pattern() {
             Serial.println("Side 4 Pattern: Gun OFF, 0.25in before end of X sweep.");
         }
         
-        if (checkForHomeCommand()) {
+        if (checkForPauseCommand()) {
             stepperX->forceStop();
             stepperZ->forceStop();
             paintGun_OFF();
@@ -278,7 +291,7 @@ void paintSide4Pattern() {
     paintGun_OFF();
     currentX = endSeq_targetX2;
 
-    if (checkForHomeCommand()) {
+    if (checkForPauseCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
         Serial.println("Side 4 Pattern Painting ABORTED during end sequence (move 3) due to home command");
         return;

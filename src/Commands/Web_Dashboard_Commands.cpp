@@ -1283,6 +1283,32 @@ bool checkForHomeCommand() {
   return false;
 }
 
+// Function to check for PAUSE command during painting operations
+// Returns true if the operation was aborted due to home command while paused
+bool checkForPauseCommand() {
+  // Process any pending WebSocket events first
+  processWebSocketEvents();
+  
+  // If paused, wait in a loop until unpaused or home command received
+  while (isPaused) {
+    // Continue processing WebSocket events while paused
+    processWebSocketEvents();
+    
+    // Check for home command while paused
+    if (homeCommandReceived) {
+      Serial.println("HOME command received while paused - aborting operation");
+      isPaused = false; // Clear pause state since we're aborting
+      return true; // Indicate that home command was received (should abort)
+    }
+    
+    // Small delay to prevent excessive CPU usage
+    delay(50);
+  }
+  
+  // Check for home command after resuming
+  return checkForHomeCommand();
+}
+
 // Function to check and restart WebSocket if needed
 void ensureWebSocketRunning() {
     if (!webSocketServerStarted || WiFi.status() != WL_CONNECTED) { // Check if server not started OR WiFi disconnected

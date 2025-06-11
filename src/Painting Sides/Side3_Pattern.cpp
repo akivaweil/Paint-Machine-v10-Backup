@@ -117,7 +117,7 @@ void paintSide3Pattern() {
             paintGunDeactivated1 = true;
         }
         
-        if (checkForHomeCommand()) {
+        if (checkForPauseCommand()) {
             stepperX->forceStop();
             paintGun_OFF();
             Serial.println("Side 3 Pattern Painting ABORTED due to home command");
@@ -129,7 +129,7 @@ void paintSide3Pattern() {
     paintGun_OFF();
     currentX = finalX1;
 
-    if (checkForHomeCommand()) {
+    if (checkForPauseCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
         Serial.println("Side 3 Pattern Painting ABORTED due to home command");
         return;
@@ -169,7 +169,7 @@ void paintSide3Pattern() {
             paintGunDeactivated2 = true;
         }
         
-        if (checkForHomeCommand()) {
+        if (checkForPauseCommand()) {
             stepperX->forceStop();
             paintGun_OFF();
             Serial.println("Side 3 Pattern Painting ABORTED due to home command");
@@ -215,7 +215,7 @@ void paintSide3Pattern() {
             paintGunDeactivated3 = true;
         }
         
-        if (checkForHomeCommand()) {
+        if (checkForPauseCommand()) {
             stepperX->forceStop();
             paintGun_OFF();
             Serial.println("Side 3 Pattern Painting ABORTED due to home command");
@@ -261,7 +261,7 @@ void paintSide3Pattern() {
             paintGunDeactivated4 = true;
         }
         
-        if (checkForHomeCommand()) {
+        if (checkForPauseCommand()) {
             stepperX->forceStop();
             paintGun_OFF();
             Serial.println("Side 3 Pattern Painting ABORTED due to home command");
@@ -308,7 +308,7 @@ void paintSide3Pattern() {
             paintGunDeactivated5 = true;
         }
         
-        if (checkForHomeCommand()) {
+        if (checkForPauseCommand()) {
             stepperX->forceStop();
             paintGun_OFF();
             Serial.println("Side 3 Pattern Painting ABORTED due to home command");
@@ -320,7 +320,7 @@ void paintSide3Pattern() {
     paintGun_OFF();
     currentX = finalX5;
 
-    if (checkForHomeCommand()) {
+    if (checkForPauseCommand()) {
         moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
         Serial.println("Side 3 Pattern Painting ABORTED due to home command");
         return;
