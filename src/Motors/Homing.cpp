@@ -81,26 +81,15 @@ bool Homing::homeAllAxes() {
         rotationStepper->setAcceleration(DEFAULT_ROT_ACCEL / 2); //? Half acceleration for homing
     }
     
-    //! STEP 4: Perform rotation homing first (if rotation motor exists)
-    bool rotationActuallyHomed = false; // Flag to indicate if rotation homing was attempted and completed
-    
-    // Perform rotation homing first if stepper exists
-    if (rotationStepper) {
-        Serial.println("Starting rotation homing to 0 degrees (shortest path)...");
-        rotateToAngle(0); // This is BLOCKING and uses shortest path logic.
-        rotationStepper->setCurrentPosition(0); // Explicitly set logical position to 0 steps
-        Serial.println("Rotation axis homed and moved to 0 degrees.");
-        rotationActuallyHomed = true;
-    }
-    
-    //! STEP 5: Start X, Y, Z motors moving toward home switches (after rotation homing)
-    Serial.println("Moving X, Y, Z axes toward home switches (if not already at switch)...");
+    //! STEP 4: Start ALL motors moving toward home (including rotation motor)
+    Serial.println("Moving X, Y, Z, and Rotation axes toward home simultaneously...");
 
     // Initialize homing status flags (ensure they are defined before this block)
     bool xHomed = false;
     bool yLeftHomed = false;
     bool yRightHomed = false;
     bool zHomed = false;
+    bool rotationHomed = false;
 
     _xHomeSwitch.update(); // Initial read before moving
     if (_xHomeSwitch.read() != HIGH) {
@@ -151,13 +140,20 @@ bool Homing::homeAllAxes() {
         zHomed = true;
     }
     
-    bool rotationHomed = (rotationStepper == NULL) || rotationActuallyHomed; // True if no stepper or if homing completed
+    // Start rotation motor homing simultaneously if it exists
+    if (rotationStepper) {
+        Serial.println("  Starting rotation homing to 0 degrees simultaneously...");
+        rotationStepper->moveTo(0); // Non-blocking move to 0 degrees position
+        // Note: rotationStepper should be configured to use shortest path logic in its movement functions
+    } else {
+        Serial.println("  No rotation motor detected, marking as homed.");
+        rotationHomed = true;
+    }
     
     unsigned long startTime = millis();
     
-    //! STEP 6: Monitor all switches simultaneously using Bounce2
-    // Rotation is already handled if present, so loop focuses on X, Y, Z
-    while (!xHomed || !yLeftHomed || !yRightHomed || !zHomed) { // Removed !rotationHomed from this condition
+    //! STEP 6: Monitor all switches and rotation motor simultaneously
+    while (!xHomed || !yLeftHomed || !yRightHomed || !zHomed || !rotationHomed) {
         //? Check timeout
         if (millis() - startTime > HOMING_TIMEOUT_MS) {
             Serial.println("ERROR: Homing timeout!");
@@ -166,9 +162,8 @@ bool Homing::homeAllAxes() {
             if (!yLeftHomed && _stepperY_Left->isRunning()) _stepperY_Left->forceStopAndNewPosition(_stepperY_Left->getCurrentPosition());
             if (!yRightHomed && _stepperY_Right->isRunning()) _stepperY_Right->forceStopAndNewPosition(_stepperY_Right->getCurrentPosition()); // Stop Y Right too
             if (!zHomed && _stepperZ->isRunning()) _stepperZ->forceStopAndNewPosition(_stepperZ->getCurrentPosition());
-            // Rotation stepper is already stopped if it was homed, or forceStop if it was stuck in rotateToAngle (though unlikely with its internal timeout)
-            if (rotationStepper && rotationStepper->isRunning()) { // Check if it somehow got stuck despite blocking call
-                 rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
+            if (!rotationHomed && rotationStepper && rotationStepper->isRunning()) {
+                rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
             }
             // setMachineState(MachineState::ERROR); // REMOVED - StateMachine handles transition
             return false;
@@ -234,15 +229,21 @@ bool Homing::homeAllAxes() {
             }
         }
         
+        //! Process Rotation motor homing
+        if (!rotationHomed && rotationStepper) {
+            if (!rotationStepper->isRunning()) {
+                // Rotation motor has reached its target position (0 degrees)
+                rotationStepper->setCurrentPosition(0); // Set logical position to 0
+                rotationHomed = true;
+                Serial.println("Rotation motor homed to 0 degrees (during while loop).");
+            }
+        }
+        
         yield(); // Allow other tasks to run
     }
     
-    //! STEP 7: All switches triggered
-    // Serial.println("All home switches triggered and rotation homed."); // Modified message
-    Serial.println("All X, Y, Z home switches triggered.");
-    if (rotationStepper) {
-        Serial.println("Rotation axis was previously homed.");
-    }
+    //! STEP 7: All switches triggered and rotation homed
+    Serial.println("All X, Y, Z home switches triggered and rotation motor homed simultaneously.");
     delay(5); //? Ensure motors stopped and positions registered
     
     //! STEP 8: Move away from switches simultaneously
@@ -299,7 +300,9 @@ bool Homing::homeAllAxes() {
     _stepperY_Left->setCurrentPosition(0);
     _stepperY_Right->setCurrentPosition(0);
     _stepperZ->setCurrentPosition(0);
-    //? Rotation motor was physically moved to 0 degrees and logical position set to 0 earlier if it exists.
+    if (rotationStepper) {
+        rotationStepper->setCurrentPosition(0); // Ensure rotation motor position is set to 0
+    }
     
     //! STEP 11: Homing completed successfully
     Serial.println("Homing sequence completed successfully.");
@@ -314,22 +317,46 @@ bool Homing::homeAllAxes() {
         rotationStepper->setAcceleration(DEFAULT_ROT_ACCEL); // Restore rotation accel too
     }
 
-    bool allPhysicalAxesHomed = xHomed && yLeftHomed && yRightHomed && zHomed;
+    bool allAxesHomed = xHomed && yLeftHomed && yRightHomed && zHomed && rotationHomed;
 
-    if (allPhysicalAxesHomed) { // Check physical axes
-        if (rotationStepper && !rotationActuallyHomed) {
-             Serial.println("Warning: Physical axes (X,Y,Z) homed, but rotation motor exists and was not homed (should not happen if no error).");
-        } else if (rotationStepper && rotationActuallyHomed) {
-            Serial.println("All axes (X,Y,Z and Rotation) homed successfully.");
-        } else {
-            Serial.println("All physical axes (X,Y,Z) homed successfully. No rotation motor or it was not homed.");
+    if (allAxesHomed) {
+        Serial.println("All axes (X,Y,Z and Rotation) homed successfully.");
+        
+        //! STEP 12: Move to position 0,32 after successful homing
+        Serial.println("Moving to position 0,32 after homing...");
+        long targetX_steps = 0; // X position 0 inches
+        long targetY_steps = (long)(32.0f * STEPS_PER_INCH_XYZ); // Y position 32 inches
+        long targetZ_steps = 0; // Z position 0 inches (home position)
+        
+        // Set speeds for the move to position 0,32
+        _stepperX->setSpeedInHz(DEFAULT_X_SPEED);
+        _stepperY_Left->setSpeedInHz(DEFAULT_Y_SPEED);
+        _stepperY_Right->setSpeedInHz(DEFAULT_Y_SPEED);
+        _stepperZ->setSpeedInHz(DEFAULT_Z_SPEED);
+        
+        // Command the move to position 0,32
+        _stepperX->moveTo(targetX_steps);
+        _stepperY_Left->moveTo(targetY_steps);
+        _stepperY_Right->moveTo(targetY_steps);
+        _stepperZ->moveTo(targetZ_steps);
+        
+        // Wait for all steppers to complete the move
+        while (_stepperX->isRunning() || _stepperY_Left->isRunning() || _stepperY_Right->isRunning() || _stepperZ->isRunning()) {
+            yield(); // Allow other tasks to run
         }
+        
+        Serial.printf("Move to position 0,32 complete - Final Position: X:%ld Y_L:%ld Y_R:%ld Z:%ld\n", 
+                     _stepperX->getCurrentPosition(), 
+                     _stepperY_Left->getCurrentPosition(), 
+                     _stepperY_Right->getCurrentPosition(), 
+                     _stepperZ->getCurrentPosition());
+        
         // clearMachineState(); // REMOVED - StateMachine handles transition
     } else {
-        Serial.println("Homing failed for one or more physical axes (X,Y,Z).");
+        Serial.println("Homing failed for one or more axes.");
         // setMachineState(MachineState::ERROR); // REMOVED - StateMachine handles transition/error reporting
     }
-    return allPhysicalAxesHomed; // Return status of X,Y,Z. Rotation is best-effort or assumed done.
+    return allAxesHomed; // Return status of all axes including rotation
 }
 
 // REMOVED individual homing functions like homeZ() as they were placeholders/not declared in Homing.h

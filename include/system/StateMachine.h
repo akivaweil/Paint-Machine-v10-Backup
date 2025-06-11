@@ -8,6 +8,7 @@
 #include "states/PausedState.h"
 #include "states/IdleState.h"
 #include "states/PnPState.h"
+#include "states/InspectTipState.h"
 
 class StateMachine {
 public:
@@ -25,6 +26,7 @@ public:
     State* getCleaningState() { return cleaningState; }
     State* getPausedState() { return pausedState; }
     State* getPnpState() { return pnpState; }
+    State* getInspectTipState() { return inspectTipState; }
     
     // Mechanism to allow a state to define the next state after a sub-routine
     void setNextStateOverride(State* state);
@@ -46,6 +48,7 @@ private:
     State* cleaningState;
     State* pausedState;
     State* pnpState;
+    State* inspectTipState;
     State* nextStateOverride; // Added for sub-routine returns
     bool _isTransitioningToPaintAllSides; // Flag for paint all sides transition
 };

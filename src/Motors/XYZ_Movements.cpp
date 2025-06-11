@@ -82,8 +82,8 @@ void moveToXYZ(long x, unsigned int xSpeed, long y, unsigned int ySpeed, long z,
         // Check for limit switches while running
         checkMotors();
         
-        // Also check for home command during movement
-        if (checkForHomeCommand()) {
+        // Also check for home/pause commands during movement
+        if (checkForPauseCommand()) {
             // Home command received, stop all motors immediately
             Serial.println("HOME command received during movement - aborting movement");
             stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
@@ -93,7 +93,7 @@ void moveToXYZ(long x, unsigned int xSpeed, long y, unsigned int ySpeed, long z,
             break; // Exit the wait loop
         }
         
-        delay(5); // Reduced delay to check more frequently
+        delay(1); // Reduced delay from 5ms to 1ms for more responsive command processing
     }
     
     if (!homeCommandReceived) {
@@ -121,8 +121,8 @@ bool moveToXYZ_HomeCheck(long x, unsigned int xSpeed, long y, unsigned int ySpee
         // Check for limit switches while running
         checkMotors();
         
-        // Also check for home command during movement
-        if (checkForHomeCommand()) {
+        // Also check for home/pause commands during movement
+        if (checkForPauseCommand()) {
             // Home command received, stop all motors immediately
             Serial.println("HOME command received during movement - aborting movement");
             stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
@@ -132,7 +132,7 @@ bool moveToXYZ_HomeCheck(long x, unsigned int xSpeed, long y, unsigned int ySpee
             return false; // Movement aborted
         }
         
-        delay(5); // Reduced delay to check more frequently
+        delay(1); // Reduced delay from 5ms to 1ms for more responsive command processing
     }
     
     Serial.printf("Move complete - Position: X:%ld Y_L:%ld Y_R:%ld Z:%ld\n", 

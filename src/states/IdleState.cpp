@@ -5,6 +5,7 @@
 #include "system/StateMachine.h" // Include for state machine access
 #include "states/PnPState.h" // Include the new PnPState
 #include "motors/ServoMotor.h" // Include for servo control
+#include "system/GlobalState.h" // Include for isPaused global variable
 // GlobalDebouncers.h is already included via IdleState.h
 
 // Reference to the global state machine instance
@@ -29,6 +30,10 @@ void IdleState::enter() {
     Serial.println("Entering Idle State");
     // Set machine status or perform actions specific to entering idle
     // setMachineState(MachineState::IDLE); // REMOVED
+
+    // Clear any lingering pause state when returning to idle
+    isPaused = false;
+    Serial.println("IdleState: Cleared pause state on entry");
 
     // Stop motors if they were moving (safety measure)
     // stopAllMotors(); // Example function call

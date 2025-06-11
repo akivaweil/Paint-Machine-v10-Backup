@@ -85,7 +85,7 @@ void paintSide3Pattern() {
 
     long paint_x_speed = paintingSettings.getSide3PaintingXSpeed();
     long paint_y_speed = paintingSettings.getSide3PaintingYSpeed();
-    long final_sweep_paint_x_speed_side3 = (long)(paint_x_speed * 0.5f);
+    long final_sweep_paint_x_speed_side3 = (long)(paint_x_speed * 0.75f);
     long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 
     // First sweep: X- direction with smooth motion
@@ -93,8 +93,8 @@ void paintSide3Pattern() {
     
     long finalX1 = currentX - sweepX_steps;
     float totalDistance1 = (float)sweepX_steps / STEPS_PER_INCH_XYZ;
-    float timeToStart1 = 0.25f * 60.0f / ((float)paint_x_speed / STEPS_PER_INCH_XYZ);
-    float timeToStop1 = (totalDistance1 - 0.5f) * 60.0f / ((float)paint_x_speed / STEPS_PER_INCH_XYZ);
+    float timeToStart1 = 0.25f * STEPS_PER_INCH_XYZ / (float)paint_x_speed;
+    float timeToStop1 = (totalDistance1 - 0.5f) * STEPS_PER_INCH_XYZ / (float)paint_x_speed;
     
     unsigned long moveStartTime1 = millis();
     stepperX->moveTo(finalX1);
@@ -107,15 +107,18 @@ void paintSide3Pattern() {
         unsigned long currentTime = millis();
         float elapsedSeconds = (currentTime - moveStartTime1) / 1000.0f;
         
-        if (!paintGunActivated1 && elapsedSeconds >= (timeToStart1 / 1000.0f)) {
+        if (!paintGunActivated1 && elapsedSeconds >= timeToStart1) {
             paintGun_ON();
             paintGunActivated1 = true;
         }
         
-        if (paintGunActivated1 && !paintGunDeactivated1 && elapsedSeconds >= (timeToStop1 / 1000.0f)) {
+        if (paintGunActivated1 && !paintGunDeactivated1 && elapsedSeconds >= timeToStop1) {
             paintGun_OFF();
             paintGunDeactivated1 = true;
         }
+        
+        // Process WebSocket events frequently during movement
+        processWebSocketEventsFrequently();
         
         if (checkForPauseCommand()) {
             stepperX->forceStop();
@@ -145,8 +148,8 @@ void paintSide3Pattern() {
     
     long finalX2 = currentX + sweepX_steps;
     float totalDistance2 = (float)sweepX_steps / STEPS_PER_INCH_XYZ;
-    float timeToStart2 = 0.25f * 60.0f / ((float)paint_x_speed / STEPS_PER_INCH_XYZ);
-    float timeToStop2 = (totalDistance2 - 0.5f) * 60.0f / ((float)paint_x_speed / STEPS_PER_INCH_XYZ);
+    float timeToStart2 = 0.25f * STEPS_PER_INCH_XYZ / (float)paint_x_speed;
+    float timeToStop2 = (totalDistance2 - 0.5f) * STEPS_PER_INCH_XYZ / (float)paint_x_speed;
     
     unsigned long moveStartTime2 = millis();
     stepperX->moveTo(finalX2);
@@ -159,15 +162,18 @@ void paintSide3Pattern() {
         unsigned long currentTime = millis();
         float elapsedSeconds = (currentTime - moveStartTime2) / 1000.0f;
         
-        if (!paintGunActivated2 && elapsedSeconds >= (timeToStart2 / 1000.0f)) {
+        if (!paintGunActivated2 && elapsedSeconds >= timeToStart2) {
             paintGun_ON();
             paintGunActivated2 = true;
         }
         
-        if (paintGunActivated2 && !paintGunDeactivated2 && elapsedSeconds >= (timeToStop2 / 1000.0f)) {
+        if (paintGunActivated2 && !paintGunDeactivated2 && elapsedSeconds >= timeToStop2) {
             paintGun_OFF();
             paintGunDeactivated2 = true;
         }
+        
+        // Process WebSocket events frequently during movement
+        processWebSocketEventsFrequently();
         
         if (checkForPauseCommand()) {
             stepperX->forceStop();
@@ -191,8 +197,8 @@ void paintSide3Pattern() {
     
     long finalX3 = currentX - sweepX_steps;
     float totalDistance3 = (float)sweepX_steps / STEPS_PER_INCH_XYZ;
-    float timeToStart3 = 0.25f * 60.0f / ((float)paint_x_speed / STEPS_PER_INCH_XYZ);
-    float timeToStop3 = (totalDistance3 - 0.5f) * 60.0f / ((float)paint_x_speed / STEPS_PER_INCH_XYZ);
+    float timeToStart3 = 0.25f * STEPS_PER_INCH_XYZ / (float)paint_x_speed;
+    float timeToStop3 = (totalDistance3 - 0.5f) * STEPS_PER_INCH_XYZ / (float)paint_x_speed;
     
     unsigned long moveStartTime3 = millis();
     stepperX->moveTo(finalX3);
@@ -205,15 +211,18 @@ void paintSide3Pattern() {
         unsigned long currentTime = millis();
         float elapsedSeconds = (currentTime - moveStartTime3) / 1000.0f;
         
-        if (!paintGunActivated3 && elapsedSeconds >= (timeToStart3 / 1000.0f)) {
+        if (!paintGunActivated3 && elapsedSeconds >= timeToStart3) {
             paintGun_ON();
             paintGunActivated3 = true;
         }
         
-        if (paintGunActivated3 && !paintGunDeactivated3 && elapsedSeconds >= (timeToStop3 / 1000.0f)) {
+        if (paintGunActivated3 && !paintGunDeactivated3 && elapsedSeconds >= timeToStop3) {
             paintGun_OFF();
             paintGunDeactivated3 = true;
         }
+        
+        // Process WebSocket events frequently during movement
+        processWebSocketEventsFrequently();
         
         if (checkForPauseCommand()) {
             stepperX->forceStop();
@@ -237,8 +246,8 @@ void paintSide3Pattern() {
     
     long finalX4 = currentX + sweepX_steps;
     float totalDistance4 = (float)sweepX_steps / STEPS_PER_INCH_XYZ;
-    float timeToStart4 = 0.25f * 60.0f / ((float)paint_x_speed / STEPS_PER_INCH_XYZ);
-    float timeToStop4 = (totalDistance4 - 0.5f) * 60.0f / ((float)paint_x_speed / STEPS_PER_INCH_XYZ);
+    float timeToStart4 = 0.25f * STEPS_PER_INCH_XYZ / (float)paint_x_speed;
+    float timeToStop4 = (totalDistance4 - 0.5f) * STEPS_PER_INCH_XYZ / (float)paint_x_speed;
     
     unsigned long moveStartTime4 = millis();
     stepperX->moveTo(finalX4);
@@ -251,15 +260,18 @@ void paintSide3Pattern() {
         unsigned long currentTime = millis();
         float elapsedSeconds = (currentTime - moveStartTime4) / 1000.0f;
         
-        if (!paintGunActivated4 && elapsedSeconds >= (timeToStart4 / 1000.0f)) {
+        if (!paintGunActivated4 && elapsedSeconds >= timeToStart4) {
             paintGun_ON();
             paintGunActivated4 = true;
         }
         
-        if (paintGunActivated4 && !paintGunDeactivated4 && elapsedSeconds >= (timeToStop4 / 1000.0f)) {
+        if (paintGunActivated4 && !paintGunDeactivated4 && elapsedSeconds >= timeToStop4) {
             paintGun_OFF();
             paintGunDeactivated4 = true;
         }
+        
+        // Process WebSocket events frequently during movement
+        processWebSocketEventsFrequently();
         
         if (checkForPauseCommand()) {
             stepperX->forceStop();
@@ -280,12 +292,12 @@ void paintSide3Pattern() {
 
     // Fifth sweep: X- direction (Final X painting movement) with smooth motion
     Serial.println("Side 3 Pattern: Fifth sweep X- with smooth paint gun control");
-    Serial.printf("Side 3 Pattern: Applying 50%% speed for final X sweep: %ld\n", final_sweep_paint_x_speed_side3);
+    Serial.printf("Side 3 Pattern: Applying 75%% speed for final X sweep: %ld\n", final_sweep_paint_x_speed_side3);
     
     long finalX5 = currentX - sweepX_steps;
     float totalDistance5 = (float)sweepX_steps / STEPS_PER_INCH_XYZ;
-    float timeToStart5 = 0.25f * 60.0f / ((float)final_sweep_paint_x_speed_side3 / STEPS_PER_INCH_XYZ);
-    float timeToStop5 = (totalDistance5 - 0.5f) * 60.0f / ((float)final_sweep_paint_x_speed_side3 / STEPS_PER_INCH_XYZ);
+    float timeToStart5 = 0.25f * STEPS_PER_INCH_XYZ / (float)final_sweep_paint_x_speed_side3;
+    float timeToStop5 = (totalDistance5 - 0.5f) * STEPS_PER_INCH_XYZ / (float)final_sweep_paint_x_speed_side3;
     
     unsigned long moveStartTime5 = millis();
     stepperX->moveTo(finalX5);
@@ -298,15 +310,18 @@ void paintSide3Pattern() {
         unsigned long currentTime = millis();
         float elapsedSeconds = (currentTime - moveStartTime5) / 1000.0f;
         
-        if (!paintGunActivated5 && elapsedSeconds >= (timeToStart5 / 1000.0f)) {
+        if (!paintGunActivated5 && elapsedSeconds >= timeToStart5) {
             paintGun_ON();
             paintGunActivated5 = true;
         }
         
-        if (paintGunActivated5 && !paintGunDeactivated5 && elapsedSeconds >= (timeToStop5 / 1000.0f)) {
+        if (paintGunActivated5 && !paintGunDeactivated5 && elapsedSeconds >= timeToStop5) {
             paintGun_OFF();
             paintGunDeactivated5 = true;
         }
+        
+        // Process WebSocket events frequently during movement
+        processWebSocketEventsFrequently();
         
         if (checkForPauseCommand()) {
             stepperX->forceStop();
@@ -328,14 +343,6 @@ void paintSide3Pattern() {
 
     //! STEP 8: Raise to safe Z height
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
-
-    //! Move to position (3,3) before homing
-    Serial.println("Moving to position (3,3,0) before homing...");
-    long xHoming = (long)(3.0 * STEPS_PER_INCH_XYZ);
-    long yHoming = (long)(3.0 * STEPS_PER_INCH_XYZ);
-    long zHoming = 0;
-    moveToXYZ(xHoming, DEFAULT_X_SPEED, yHoming, DEFAULT_Y_SPEED, zHoming, DEFAULT_Z_SPEED);
-    Serial.println("Reached position (3,3,0).");
 
     //! Transition to Homing State
     Serial.println("Side 3 painting complete. Transitioning to Homing State...");

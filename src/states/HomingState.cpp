@@ -26,7 +26,7 @@ extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
 extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
-// extern FastAccelStepper *rotationStepper; // Declared in Rotation_Motor.h
+extern FastAccelStepper *rotationStepper; // Declared in Rotation_Motor.h
 
 // Machine state variables
 // bool isHoming = false; // Moved to Homing class or managed internally

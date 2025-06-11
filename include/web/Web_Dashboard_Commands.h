@@ -25,6 +25,9 @@ void sendWebStatus(WebSocketsServer* webSocket, const char* message);
 // Process WebSocket events without executing commands (for checking during operations)
 void processWebSocketEvents();
 
+// Enhanced WebSocket event processing for critical operations
+void processWebSocketEventsFrequently();
+
 // Check if a home command was received during painting operations
 bool checkForHomeCommand();
 bool checkForPauseCommand();

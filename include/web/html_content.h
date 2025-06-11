@@ -988,6 +988,24 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
                     }
                 }
                 
+                // Check for inspect tip status updates
+                else if (messageText.startsWith('INSPECT_TIP_STATUS:')) {
+                    const status = messageText.split(':')[1];
+                    console.log('Updating inspect tip status to: ' + status);
+                    
+                    // Update UI toggle without triggering a new command
+                    const toggle = document.getElementById('inspectTipToggle');
+                    const label = document.getElementById('inspectTipToggleLabel');
+                    
+                    if (status === 'ON') {
+                        toggle.checked = true;
+                        label.textContent = 'ON';
+                    } else {
+                        toggle.checked = false;
+                        label.textContent = 'OFF';
+                    }
+                }
+                
                 // Handle settings messages
                 else if (messageText.startsWith('SETTING:')) {
                     const parts = messageText.split(':');
@@ -1021,6 +1039,7 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
             const isIdle = (stateName === 'IDLE');
             const isPainting = (stateName === 'PAINTING' || stateName === 'PAINTING_INDIVIDUAL');
             const isCleaning = (stateName === 'CLEANING');
+            const isInspectTip = (stateName === 'INSPECT_TIP');
             
             // Get the main controls container and pause container
             const mainControlsContainer = document.querySelector('.top-controls-container');
@@ -1056,8 +1075,8 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
                 mainControlsContainer.parentNode.insertBefore(pauseContainer, mainControlsContainer);
             }
             
-            // Show/hide containers based on painting state
-            if (isPainting || isCleaning) {
+            // Show/hide containers based on machine state
+            if (isPainting || isCleaning || isInspectTip) {
                 // Hide all normal controls
                 if (mainControlsContainer) mainControlsContainer.style.display = 'none';
                 if (patternSettingsContainer) patternSettingsContainer.style.display = 'none';
@@ -1199,6 +1218,26 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
             
             // Debug toggle state
             console.log(`Toggle Paint Gun: ${enabled ? 'ON' : 'OFF'}, checked=${toggle.checked}`);
+        }
+        
+        // Toggle Inspect Tip
+        function toggleInspectTip(enabled) {
+            // Send the command to the device
+            const command = enabled ? 'INSPECT_TIP_ON' : 'INSPECT_TIP_OFF';
+            sendCommand(command);
+            
+            // Update the UI explicitly
+            const toggle = document.getElementById('inspectTipToggle');
+            const label = document.getElementById('inspectTipToggleLabel');
+            
+            // Set the toggle state
+            toggle.checked = enabled;
+            
+            // Update the label
+            label.textContent = enabled ? 'ON' : 'OFF';
+            
+            // Debug toggle state
+            console.log(`Toggle Inspect Tip: ${enabled ? 'ON' : 'OFF'}, checked=${toggle.checked}`);
         }
         
         // Toggle Pause/Resume
@@ -1539,7 +1578,7 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
                 <div class="multiple-coats-controls">
                     <div class="coats-input-group">
                         <label for="numCoats">Number of Coats:</label>
-                        <input type="number" id="numCoats" class="setting-input" min="1" max="10" value="3" step="1">
+                        <input type="number" id="numCoats" class="setting-input" min="1" max="10" value="2" step="1">
                     </div>
                     <div class="coats-input-group">
                         <label for="interCoatDelay">Delay (s):</label>
@@ -1617,6 +1656,15 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
                     <input type="checkbox" id="paintGunToggle" onchange="togglePaintGun(this.checked)">
                     <span class="slider"></span>
                     <span class="toggle-label" id="paintGunToggleLabel">OFF</span>
+                </label>
+            </div>
+
+            <div class="toggle-container">
+                <h3>Inspect Tip</h3>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="inspectTipToggle" onchange="toggleInspectTip(this.checked)">
+                    <span class="slider"></span>
+                    <span class="toggle-label" id="inspectTipToggleLabel">OFF</span>
                 </label>
             </div>
         </div>

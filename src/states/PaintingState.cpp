@@ -10,6 +10,7 @@
 #include "hardware/paintGun_Functions.h" // Added include for paintGun_OFF
 #include "motors/XYZ_Movements.h"      // ADDED: For moveToXYZ
 #include "utils/settings.h"            // ADDED: For default speeds
+#include "system/GlobalState.h"        // ADDED: For isPaused global variable
 
 // Define necessary variables or includes specific to PaintingState if known
 // #include "settings.h"
@@ -36,16 +37,20 @@ void PaintingState::enter() {
     Serial.print("PaintingState: enter() called. CurrentStep BEFORE logic: ");
     Serial.println(currentStep); // Log its value *before* the if. Add specific name if possible later.
     
+    // Clear any lingering pause state from previous cycles
+    isPaused = false;
+    Serial.println("PaintingState: Cleared pause state for new painting cycle");
+    
     // Check if we are in the special "Paint All Sides" transition
     if (stateMachine && stateMachine->isTransitioningToPaintAllSides()) {
-        Serial.println("PaintingState: Detected 'Paint All Sides' transition. Skipping pre-paint clean request and starting 'All Sides' directly.");
+        Serial.println("PaintingState: Detected 'Paint All Sides' transition. Starting 'All Sides' directly without cleaning.");
         currentStep = PS_PERFORM_ALL_SIDES_PAINTING; // Set step to perform all sides painting
         stateMachine->clearTransitioningToPaintAllSidesFlag(); // Clear the flag as it has been handled
     } else if (currentStep == PS_IDLE) {
-        Serial.println("PaintingState: enter() - Normal entry or not 'Paint All Sides' specific transition. Setting to PS_REQUEST_PRE_PAINT_CLEAN.");
-        currentStep = PS_REQUEST_PRE_PAINT_CLEAN; // Start the normal sequence (request clean)
+        Serial.println("PaintingState: enter() - Normal entry. Starting 'All Sides' directly without cleaning.");
+        currentStep = PS_PERFORM_ALL_SIDES_PAINTING; // Go directly to painting
     } else {
-        Serial.print("PaintingState: enter() - CurrentStep is not IDLE and not a specific 'Paint All Sides' transition. Preserving currentStep: ");
+        Serial.print("PaintingState: enter() - CurrentStep is not IDLE. Preserving currentStep: ");
         Serial.println(currentStep); // Log its value if preserved.
     }
     Serial.print("PaintingState: enter() finished. CurrentStep AFTER logic: ");
@@ -58,22 +63,8 @@ void PaintingState::update() {
     long xPos, yPos, zPos;
     
     switch (currentStep) {
-        case PS_REQUEST_PRE_PAINT_CLEAN:
-            Serial.println("PaintingState: Requesting short pre-paint clean.");
-            if (stateMachine && stateMachine->getCleaningState()) {
-                static_cast<CleaningState*>(stateMachine->getCleaningState())->setShortMode(true);
-                stateMachine->setNextStateOverride(this); // Return to PaintingState
-                currentStep = PS_PERFORM_ALL_SIDES_PAINTING; // Set next step for when we return
-                stateMachine->changeState(stateMachine->getCleaningState());
-                // PaintingState is no longer active until CleaningState returns.
-            } else {
-                Serial.println("ERROR: PaintingState - Cannot initiate cleaning, SM or CleaningState not available.");
-                currentStep = PS_REQUEST_HOMING; // Skip to homing on error
-            }
-            break;
-
         case PS_PERFORM_ALL_SIDES_PAINTING:
-            Serial.println("PaintingState: Pre-paint clean complete. Starting all sides painting routine.");
+            Serial.println("PaintingState: Starting all sides painting routine.");
             paintAllSides(); // This is assumed to be a blocking call
             Serial.println("PaintingState: All Sides Painting routine finished.");
             currentStep = PS_MOVE_TO_POSITION_BEFORE_HOMING;

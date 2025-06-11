@@ -14,7 +14,6 @@ public:
 private:
     enum PaintingSubStep {
         PS_IDLE,
-        PS_REQUEST_PRE_PAINT_CLEAN,
         PS_PERFORM_ALL_SIDES_PAINTING,
         PS_MOVE_TO_POSITION_BEFORE_HOMING,
         PS_REQUEST_HOMING

@@ -10,6 +10,8 @@
 #include "motors/Homing.h"
 #include "motors/Rotation_Motor.h"
 #include "system/StateMachine.h"
+#include "system/GlobalState.h"    // For isPaused
+#include <WebSocketsServer.h>     // For webSocket.loop()
 
 extern ServoMotor myServo;
 extern FastAccelStepper *stepperX;
@@ -20,6 +22,7 @@ extern bool isPressurePot_ON;
 extern FastAccelStepperEngine engine;
 extern FastAccelStepper *rotationStepper;
 extern StateMachine* stateMachine;
+extern WebSocketsServer webSocket;    // For pause loop
 
 // Global variable definition for requested coats
 int g_requestedCoats = 3; // Default to 3 coats
@@ -70,6 +73,9 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     
     //! STEP 1: Paint left side (Side 4)
     Serial.print("Starting Left Side (Side 4) ("); Serial.print(runLabel); Serial.println(")");
+    while (isPaused) { webSocket.loop(); delay(100); }
+    // Process WebSocket events immediately before starting side painting
+    processWebSocketEvents();
     paintSide4Pattern();
     if (checkForPauseCommand()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after left side)");
@@ -78,6 +84,9 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
 
     //! STEP 2: Paint back side (Side 3)
     Serial.print("Starting Back Side (Side 3) ("); Serial.print(runLabel); Serial.println(")");
+    while (isPaused) { webSocket.loop(); delay(100); }
+    // Process WebSocket events immediately before starting side painting
+    processWebSocketEvents();
     paintSide3Pattern();
     if (checkForPauseCommand()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after back side)");
@@ -86,6 +95,9 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
 
     //! STEP 3: Paint right side (Side 2)
     Serial.print("Starting Right Side (Side 2) ("); Serial.print(runLabel); Serial.println(")");
+    while (isPaused) { webSocket.loop(); delay(100); }
+    // Process WebSocket events immediately before starting side painting
+    processWebSocketEvents();
     paintSide2Pattern();
     if (checkForPauseCommand()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after right side)");
@@ -94,6 +106,9 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     
     //! STEP 4: Paint front side (Side 1)
     Serial.print("Starting Front Side (Side 1) ("); Serial.print(runLabel); Serial.println(")");
+    while (isPaused) { webSocket.loop(); delay(100); }
+    // Process WebSocket events immediately before starting side painting
+    processWebSocketEvents();
     paintSide1Pattern();
     if (checkForPauseCommand()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after front side)");
@@ -160,6 +175,10 @@ void paintAllSides() {
         //! ************************************************************************
         //! INTER-COAT DELAY AND LOADING BAR
         //! ************************************************************************
+        Serial.println("Setting servo to 180 degrees for inter-coat movement.");
+        myServo.setAngle(180);
+        Serial.println("Servo set to 180 degrees during inter-coat delay.");
+        
         Serial.println("Preparing for inter-coat delay: Moving X to loading bar start position.");
         long target_x_start_loading_bar_steps = (long)(LOADING_BAR_X_START * STEPS_PER_INCH_XYZ);
         stepperX->setSpeedInHz(DEFAULT_X_SPEED);
@@ -218,6 +237,13 @@ void paintAllSides() {
     }
 
     Serial.println("All Sides Painting Process Fully Completed.");
+
+    //! ************************************************************************
+    //! PRESSURE POT DEPRESSURIZATION
+    //! ************************************************************************
+    Serial.println("Depressurizing pressure pot after painting completion...");
+    PressurePot_OFF();
+    Serial.println("Pressure pot depressurized.");
 
     //! ************************************************************************
     //! HOMING SEQUENCE

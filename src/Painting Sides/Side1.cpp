@@ -26,168 +26,87 @@ extern StateMachine* stateMachine; // Declare external state machine instance
 //* *************************** SIDE 1 *************************************
 //* ************************************************************************
 
-// Returns true if painting completed, false if aborted due to home command
+// Simplified hardcoded painting function - no pauses or checks
 bool paintSide1Pattern() {
-    Serial.println("Starting Side 1 Pattern Painting");
+    Serial.println("Starting Side 1 Pattern Painting - Simplified Version");
 
-    //! Load Servo Angle
-    int servoAngle = paintingSettings.getServoAngleSide1(); // NEW WAY: Use getter
-
-    // Check for home/pause commands before starting
-    if (checkForPauseCommand()) {
-        Serial.println("Side 1 Pattern Painting ABORTED due to home command (before starting)");
-        return false;
-    }
-
-    //! Set Servo Angle FIRST
+    //! Set Servo Angle
+    int servoAngle = paintingSettings.getServoAngleSide1();
     myServo.setAngle(servoAngle);
-    Serial.println("Servo set to: " + String(servoAngle) + " degrees for Side 1 side");
+    Serial.println("Servo set to: " + String(servoAngle) + " degrees for Side 1");
 
-    //! STEP 0: Turn on pressure pot
+    //! Turn on pressure pot
     PressurePot_ON();
-    
-    // Check for home/pause commands after servo and pressure
-    if (checkForPauseCommand()) {
-        Serial.println("Side 1 Pattern Painting ABORTED due to home command (after prep)");
-        return false;
-    }
 
-    //! STEP 1: Move to side 1 painting Z height
-    // Use constants directly from settings/painting.h
-    long zPos = (long)(paintingSettings.getSide1ZHeight() * STEPS_PER_INCH_XYZ); // Use getter
-    long sideZPos = (long)(paintingSettings.getSide1SideZHeight() * STEPS_PER_INCH_XYZ); // Use getter
-
-    // Use constants from utils/settings.h for default speeds
+    //! Move to side 1 safe Z height
+    long zPos = (long)(paintingSettings.getSide1ZHeight() * STEPS_PER_INCH_XYZ);
+    long sideZPos = (long)(paintingSettings.getSide1SideZHeight() * STEPS_PER_INCH_XYZ);
     moveToXYZ(stepperX->getCurrentPosition(), DEFAULT_X_SPEED,
               stepperY_Left->getCurrentPosition(), DEFAULT_Y_SPEED,
               sideZPos, DEFAULT_Z_SPEED);
-              
-    // Check for home/pause commands after Z move
-    if (checkForPauseCommand()) {
-        Serial.println("Side 1 Pattern Painting ABORTED due to home command (after initial Z)");
-        return false;
-    }
 
-    //! STEP 2: Rotate to the side 1 position
-    rotateToAngle(SIDE1_ROTATION_ANGLE); // Speed likely handled within rotateToAngle
+    //! Rotate to side 1 position
+    rotateToAngle(SIDE1_ROTATION_ANGLE);
     Serial.println("Rotated to side 1 position");
-    
-    // Check for home/pause commands after rotation
-    if (checkForPauseCommand()) {
-        Serial.println("Side 1 Pattern Painting ABORTED due to home command (after rotation)");
-        return false;
-    }
 
-    //! STEP 3: Move to start position (P2)
-    long startX = (long)(paintingSettings.getSide1StartX() * STEPS_PER_INCH_XYZ); // Use getter
-    long startY = (long)(paintingSettings.getSide1StartY() * STEPS_PER_INCH_XYZ); // Use getter
+    //! Move to start position
+    long startX = (long)(paintingSettings.getSide1StartX() * STEPS_PER_INCH_XYZ);
+    long startY = (long)(paintingSettings.getSide1StartY() * STEPS_PER_INCH_XYZ);
     moveToXYZ(startX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
-    Serial.println("Moved to side 1 pattern start position (P2)");
-    
-    // Check for home/pause commands after move to start
-    if (checkForPauseCommand()) {
-        Serial.println("Side 1 Pattern Painting ABORTED due to home command (after move to start)");
-        return false;
-    }
+    Serial.println("Moved to side 1 pattern start position");
 
-    //! STEP 4: Lower to painting Z height
+    //! Lower to painting Z height
     moveToXYZ(startX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
-    
-    // Check for home/pause commands after Z lower
-    if (checkForPauseCommand()) {
-        // Raise to safe Z height before aborting
-        moveToXYZ(startX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
-        Serial.println("Side 1 Pattern Painting ABORTED due to home command (after Z lower)");
-        return false;
-    }
 
-    //! STEP 5: Execute simplified side 1 painting pattern (Single X Shift)
-    long currentX = startX;
-    long currentY = startY;
-    long shiftXDistance = (long)(paintingSettings.getSide1ShiftX() * STEPS_PER_INCH_XYZ); // Use getter for shift distance
-    long xSpeed = paintingSettings.getSide1PaintingXSpeed(); // Use getter for X speed
-    long ySpeed = paintingSettings.getSide1PaintingYSpeed(); // Use getter for Y speed (though Y isn't moving)
-    long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
-
-    Serial.println("Side 1 Pattern: Performing single X shift with smooth paint gun control");
-
-    // Calculate timing for paint gun control during smooth movement
+    //! Execute painting pattern - continuous motion with paint gun control
+    long shiftXDistance = (long)(paintingSettings.getSide1ShiftX() * STEPS_PER_INCH_XYZ);
+    long xSpeed = paintingSettings.getSide1PaintingXSpeed();
     long finalX = startX + shiftXDistance;
-    float totalDistance = (float)shiftXDistance / STEPS_PER_INCH_XYZ; // Distance in inches
-    float paintOnDistance = totalDistance - 0.5f; // Paint distance (total minus 0.5 inches)
-    
-    // Calculate timing based on speed (steps per second)
-    float timeToStart = 0.25f * 60.0f / ((float)xSpeed / STEPS_PER_INCH_XYZ); // Time to travel 0.25 inches
-    float timeToStop = paintOnDistance * 60.0f / ((float)xSpeed / STEPS_PER_INCH_XYZ); // Time when paint should stop
-    
-    // Start the smooth movement
-    unsigned long moveStartTime = millis();
-    
-    // Begin continuous movement to final position
+    long paintStartX = startX + (long)(0.25f * STEPS_PER_INCH_XYZ);
+    long paintStopX = finalX - (long)(0.75f * STEPS_PER_INCH_XYZ);
+
+    Serial.println("Side 1 Pattern: Executing continuous X movement with paint gun control");
+
+    // Start continuous movement from startX to finalX
     stepperX->moveTo(finalX);
     stepperX->setSpeedInHz(xSpeed);
     
-    bool paintGunActivated = false;
-    bool paintGunDeactivated = false;
+    bool paintGunOn = false;
     
-    // Monitor movement and control paint gun at precise timing
-    while(stepperX->isRunning()) {
-        unsigned long currentTime = millis();
-        float elapsedSeconds = (currentTime - moveStartTime) / 1000.0f;
+    // Monitor movement and control paint gun based on position
+    while (stepperX->isRunning()) {
+        long currentX = stepperX->getCurrentPosition();
         
-        // Turn paint gun ON after 0.25 inches (based on time)
-        if (!paintGunActivated && elapsedSeconds >= (timeToStart / 1000.0f)) {
+        // Turn paint gun ON when reaching paint start position
+        if (!paintGunOn && currentX >= paintStartX) {
             paintGun_ON();
-            paintGunActivated = true;
-            Serial.println("Paint gun ON - smooth motion");
+            paintGunOn = true;
+            Serial.println("Paint gun ON during movement");
         }
         
-        // Turn paint gun OFF 0.25 inches before end (based on time)  
-        if (paintGunActivated && !paintGunDeactivated && elapsedSeconds >= (timeToStop / 1000.0f)) {
+        // Turn paint gun OFF when reaching paint stop position
+        if (paintGunOn && currentX >= paintStopX) {
             paintGun_OFF();
-            paintGunDeactivated = true;
-            Serial.println("Paint gun OFF - smooth motion continues");
+            paintGunOn = false;
+            Serial.println("Paint gun OFF during movement");
         }
         
-        // Check for home/pause commands during movement
-        if (checkForPauseCommand()) {
-            stepperX->forceStop();
-            paintGun_OFF();
-            Serial.println("Side 1 Pattern Painting ABORTED due to home command during movement");
-            return false;
-        }
-        
-        delay(1); // Small delay to prevent excessive CPU usage
+        // Small delay to prevent excessive CPU usage
+        delay(1);
     }
     
     // Ensure paint gun is off at the end
-    paintGun_OFF();
-    
-    // Update current position
-    currentX = finalX; 
-
-    // Check for home/pause commands after the single move
-    if (checkForPauseCommand()) {
-        // Raise to safe Z height before aborting
-        moveToXYZ(finalX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
-        Serial.println("Side 1 Pattern Painting ABORTED due to home command (after painting)");
-        return false;
+    if (paintGunOn) {
+        paintGun_OFF();
+        Serial.println("Paint gun OFF - movement complete");
     }
 
-    //! STEP 6: Raise to safe Z height (Was STEP 8)
-    moveToXYZ(finalX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
+    //! Raise to safe Z height
+    moveToXYZ(finalX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
 
-    //! STEP 7: Move to position (3,3) before homing
-    Serial.println("Moving to position (3,3,0) before homing...");
-    long xHoming = (long)(3.0 * STEPS_PER_INCH_XYZ);
-    long yHoming = (long)(3.0 * STEPS_PER_INCH_XYZ);
-    long zHoming = 0;
-    moveToXYZ(xHoming, DEFAULT_X_SPEED, yHoming, DEFAULT_Y_SPEED, zHoming, DEFAULT_Z_SPEED);
-    Serial.println("Reached position (3,3,0).");
-
-    //! Stage 5: Transition back to Homing State after completion
+    //! Transition back to Homing State
     Serial.println("Side 1 painting complete. Transitioning to Homing State...");
-    stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call
+    stateMachine->changeState(stateMachine->getHomingState());
 
     return true;
 }
