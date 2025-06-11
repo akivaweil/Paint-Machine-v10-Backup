@@ -142,9 +142,10 @@ bool Homing::homeAllAxes() {
     
     // Start rotation motor homing simultaneously if it exists
     if (rotationStepper) {
-        Serial.println("  Starting rotation homing to 0 degrees simultaneously...");
-        rotationStepper->moveTo(0); // Non-blocking move to 0 degrees position
-        // Note: rotationStepper should be configured to use shortest path logic in its movement functions
+        Serial.println("  Starting rotation homing to 0 degrees using shortest path...");
+        rotateToAngle(0); // Use shortest path logic to reach 0 degrees
+        rotationHomed = true; // rotateToAngle is blocking, so it's complete when it returns
+        Serial.println("  Rotation motor homed to 0 degrees using shortest path.");
     } else {
         Serial.println("  No rotation motor detected, marking as homed.");
         rotationHomed = true;
@@ -229,15 +230,8 @@ bool Homing::homeAllAxes() {
             }
         }
         
-        //! Process Rotation motor homing
-        if (!rotationHomed && rotationStepper) {
-            if (!rotationStepper->isRunning()) {
-                // Rotation motor has reached its target position (0 degrees)
-                rotationStepper->setCurrentPosition(0); // Set logical position to 0
-                rotationHomed = true;
-                Serial.println("Rotation motor homed to 0 degrees (during while loop).");
-            }
-        }
+        //! Rotation motor homing is already complete (rotateToAngle is blocking)
+        // No need to monitor rotation motor in this loop
         
         yield(); // Allow other tasks to run
     }
