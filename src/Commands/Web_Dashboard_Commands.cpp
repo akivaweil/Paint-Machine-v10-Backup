@@ -457,6 +457,30 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
             webSocket->sendTXT(num, "CMD_ACK: Inspect Tip already off");
         }
     }
+    else if (baseCommandAction == "INSPECT_TIP_TO_PAINTING") {
+        Serial.println("Transitioning from Inspect Tip to Painting via web command");
+        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getInspectTipState()) {
+            // Cast to InspectTipState to call transitionToPainting method
+            InspectTipState* inspectState = static_cast<InspectTipState*>(stateMachine->getInspectTipState());
+            inspectState->transitionToPainting();
+            webSocket->sendTXT(num, "CMD_ACK: Transitioning from Inspect Tip to Painting");
+        } else {
+            Serial.println("Inspect Tip to Painting command ignored: Not in Inspect Tip state");
+            webSocket->sendTXT(num, "CMD_ERROR: Machine must be in Inspect Tip state");
+        }
+    }
+    else if (baseCommandAction == "INSPECT_TIP_TO_PNP") {
+        Serial.println("Transitioning from Inspect Tip to PnP via web command");
+        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getInspectTipState()) {
+            // Cast to InspectTipState to call transitionToPnP method
+            InspectTipState* inspectState = static_cast<InspectTipState*>(stateMachine->getInspectTipState());
+            inspectState->transitionToPnP();
+            webSocket->sendTXT(num, "CMD_ACK: Transitioning from Inspect Tip to PnP");
+        } else {
+            Serial.println("Inspect Tip to PnP command ignored: Not in Inspect Tip state");
+            webSocket->sendTXT(num, "CMD_ERROR: Machine must be in Inspect Tip state");
+        }
+    }
     else if (baseCommandAction == "PAINT_SIDE_1") {
         Serial.println("Painting side 1...");
         isActivePainting = true;

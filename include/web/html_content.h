@@ -1075,16 +1075,69 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
                 mainControlsContainer.parentNode.insertBefore(pauseContainer, mainControlsContainer);
             }
             
+            // Create inspect tip container if it doesn't exist
+            let inspectTipContainer = document.getElementById('inspectTipContainer');
+            if (!inspectTipContainer) {
+                inspectTipContainer = document.createElement('div');
+                inspectTipContainer.id = 'inspectTipContainer';
+                inspectTipContainer.className = 'top-controls-container';
+                inspectTipContainer.style.display = 'none';
+                inspectTipContainer.innerHTML = `
+                    <div class="integrated-main-card main-card" style="text-align: center;">
+                        <h2 style="color: #2196f3; margin-bottom: 20px;">Inspecting Tip</h2>
+                        <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                            <button id="inspectTipToPaintingBtn" class="main-btn" style="background: linear-gradient(90deg, #4caf50 60%, #45a049 100%); font-size: 1.0rem; padding: 12px 24px;" onclick="transitionToPainting()">
+                                <span class="btn-icon" aria-hidden="true">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M9 12L2 5L5 2L12 9L19 2L22 5L15 12L22 19L19 22L12 15L5 22L2 19L9 12Z" fill="currentColor"/>
+                                    </svg>
+                                </span>
+                                <span class="btn-label">START PAINTING</span>
+                            </button>
+                            <button id="inspectTipToPnpBtn" class="main-btn" style="background: linear-gradient(90deg, #ff9800 60%, #f57c00 100%); font-size: 1.0rem; padding: 12px 24px;" onclick="transitionToPnP()">
+                                <span class="btn-icon" aria-hidden="true">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z" fill="currentColor"/>
+                                    </svg>
+                                </span>
+                                <span class="btn-label">START PnP</span>
+                            </button>
+                            <button id="inspectTipOffBtn" class="main-btn" style="background: linear-gradient(90deg, #f44336 60%, #d32f2f 100%); font-size: 1.0rem; padding: 12px 24px;" onclick="toggleInspectTip(false)">
+                                <span class="btn-icon" aria-hidden="true">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/>
+                                    </svg>
+                                </span>
+                                <span class="btn-label">EXIT INSPECT</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                // Insert inspect tip container before the main controls container
+                mainControlsContainer.parentNode.insertBefore(inspectTipContainer, mainControlsContainer);
+            }
+            
             // Show/hide containers based on machine state
-            if (isPainting || isCleaning || isInspectTip) {
+            if (isPainting || isCleaning) {
                 // Hide all normal controls
                 if (mainControlsContainer) mainControlsContainer.style.display = 'none';
                 if (patternSettingsContainer) patternSettingsContainer.style.display = 'none';
                 if (manualControlSection) manualControlSection.style.display = 'none';
                 if (pnpSettingsContainer) pnpSettingsContainer.style.display = 'none';
+                if (inspectTipContainer) inspectTipContainer.style.display = 'none';
                 
                 // Show pause container
                 if (pauseContainer) pauseContainer.style.display = 'flex';
+            } else if (isInspectTip) {
+                // Hide all normal controls
+                if (mainControlsContainer) mainControlsContainer.style.display = 'none';
+                if (patternSettingsContainer) patternSettingsContainer.style.display = 'none';
+                if (manualControlSection) manualControlSection.style.display = 'none';
+                if (pnpSettingsContainer) pnpSettingsContainer.style.display = 'none';
+                if (pauseContainer) pauseContainer.style.display = 'none';
+                
+                // Show inspect tip container
+                if (inspectTipContainer) inspectTipContainer.style.display = 'flex';
             } else {
                 // Show all normal controls
                 if (mainControlsContainer) mainControlsContainer.style.display = 'flex';
@@ -1092,8 +1145,9 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
                 if (manualControlSection) manualControlSection.style.display = 'block';
                 if (pnpSettingsContainer) pnpSettingsContainer.style.display = 'block';
                 
-                // Hide pause container
+                // Hide special containers
                 if (pauseContainer) pauseContainer.style.display = 'none';
+                if (inspectTipContainer) inspectTipContainer.style.display = 'none';
                 
                 // Update normal button states when not painting
                 const paintSide1Btn = document.getElementById('paintSide1Btn');
@@ -1238,6 +1292,18 @@ const char HTML_PROGMEM[] PROGMEM = R"rawliteral(
             
             // Debug toggle state
             console.log(`Toggle Inspect Tip: ${enabled ? 'ON' : 'OFF'}, checked=${toggle.checked}`);
+        }
+        
+        // Transition from Inspect Tip to Painting
+        function transitionToPainting() {
+            console.log('Transitioning from Inspect Tip to Painting');
+            sendCommand('INSPECT_TIP_TO_PAINTING');
+        }
+        
+        // Transition from Inspect Tip to PnP
+        function transitionToPnP() {
+            console.log('Transitioning from Inspect Tip to PnP');
+            sendCommand('INSPECT_TIP_TO_PNP');
         }
         
         // Toggle Pause/Resume

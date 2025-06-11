@@ -80,6 +80,32 @@ void InspectTipState::update() {
             currentStep = ITS_IDLE;
             break;
             
+        case ITS_TRANSITIONING_TO_PAINTING:
+            Serial.println("InspectTipState: Transitioning to painting state");
+            if (stateMachine && stateMachine->getPaintingState()) {
+                stateMachine->changeState(stateMachine->getPaintingState());
+            } else {
+                Serial.println("ERROR: InspectTipState - Cannot transition to PaintingState, returning to idle");
+                if (stateMachine && stateMachine->getIdleState()) {
+                    stateMachine->changeState(stateMachine->getIdleState());
+                }
+            }
+            currentStep = ITS_IDLE;
+            break;
+            
+        case ITS_TRANSITIONING_TO_PNP:
+            Serial.println("InspectTipState: Transitioning to PnP state");
+            if (stateMachine && stateMachine->getPnpState()) {
+                stateMachine->changeState(stateMachine->getPnpState());
+            } else {
+                Serial.println("ERROR: InspectTipState - Cannot transition to PnPState, returning to idle");
+                if (stateMachine && stateMachine->getIdleState()) {
+                    stateMachine->changeState(stateMachine->getIdleState());
+                }
+            }
+            currentStep = ITS_IDLE;
+            break;
+            
         case ITS_IDLE:
             // Should not reach here normally
             break;
@@ -103,5 +129,21 @@ const char* InspectTipState::getName() const {
 void InspectTipState::returnToIdle() {
     if (currentStep == ITS_AT_INSPECT_POSITION) {
         currentStep = ITS_RETURNING_TO_ORIGINAL_POSITION;
+    }
+}
+
+// Method to trigger transition to painting (called from web command)
+void InspectTipState::transitionToPainting() {
+    if (currentStep == ITS_AT_INSPECT_POSITION) {
+        Serial.println("InspectTipState: Transitioning directly to painting from inspect position");
+        currentStep = ITS_TRANSITIONING_TO_PAINTING;
+    }
+}
+
+// Method to trigger transition to PnP (called from web command)
+void InspectTipState::transitionToPnP() {
+    if (currentStep == ITS_AT_INSPECT_POSITION) {
+        Serial.println("InspectTipState: Transitioning directly to PnP from inspect position");
+        currentStep = ITS_TRANSITIONING_TO_PNP;
     }
 } 
