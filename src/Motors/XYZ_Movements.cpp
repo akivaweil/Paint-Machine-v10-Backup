@@ -8,6 +8,7 @@
 #include <FastAccelStepper.h>
 #include <Bounce2.h>   // For debouncing limit switches
 #include "web/Web_Dashboard_Commands.h" // For checking home commands
+#include <WebSocketsServer.h>     // For webSocket.loop()
 
 // Define stepper engine and steppers (example)
 extern FastAccelStepperEngine engine; // Use the global one from Setup.cpp
@@ -15,6 +16,12 @@ extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left; // Renamed from stepperY
 extern FastAccelStepper *stepperY_Right; // Added second Y motor
 extern FastAccelStepper *stepperZ;
+extern WebSocketsServer webSocket;    // For immediate command processing
+
+// External references to immediate command system
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
 
 // Switch debouncing objects
 extern Bounce debounceX;
@@ -23,6 +30,40 @@ extern Bounce debounceY_Right; // Added second Y debouncer
 extern Bounce debounceZ;
 
 extern volatile bool homeCommandReceived; // For direct access to the flag
+
+// Function to check for immediate commands during motor movement
+bool checkForImmediateCommandsXYZ() {
+    // Process any pending WebSocket events to catch immediate commands
+    webSocket.loop();
+    
+    // Check for immediate commands
+    if (immediateCommandPending) {
+        Serial.println("*** IMMEDIATE COMMAND DETECTED during XYZ movement - ABORTING NOW! ***");
+        Serial.printf("*** Command: %s, Client: %d ***\n", pendingCommand.c_str(), pendingCommandClientNum);
+        
+        // Stop all motors immediately
+        if (stepperX && stepperX->isRunning()) {
+            Serial.println("*** FORCE STOPPING X MOTOR ***");
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        }
+        if (stepperY_Left && stepperY_Left->isRunning()) {
+            Serial.println("*** FORCE STOPPING Y_LEFT MOTOR ***");
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        }
+        if (stepperY_Right && stepperY_Right->isRunning()) {
+            Serial.println("*** FORCE STOPPING Y_RIGHT MOTOR ***");
+            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+        }
+        if (stepperZ && stepperZ->isRunning()) {
+            Serial.println("*** FORCE STOPPING Z MOTOR ***");
+            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        }
+        
+        return true; // Immediate command pending
+    }
+    
+    return false; // No immediate commands
+}
 
 //* ************************************************************************
 //* ************************* XYZ MOVEMENTS **************************
@@ -80,6 +121,12 @@ void moveToXYZ(long x, unsigned int xSpeed, long y, unsigned int ySpeed, long z,
     
     // Wait until all steppers have completed their movements
     while (stepperX->isRunning() || stepperY_Left->isRunning() || stepperY_Right->isRunning() || stepperZ->isRunning()) { // Updated condition
+        // **KEY ENHANCEMENT**: Check for immediate commands during motor movement
+        if (checkForImmediateCommandsXYZ()) {
+            Serial.println("*** XYZ movement ABORTED due to immediate command ***");
+            return; // Exit immediately
+        }
+        
         // Check for limit switches while running
         checkMotors();
         
@@ -97,7 +144,7 @@ void moveToXYZ(long x, unsigned int xSpeed, long y, unsigned int ySpeed, long z,
         delay(1); // Reduced delay from 5ms to 1ms for more responsive command processing
     }
     
-    if (!homeCommandReceived) {
+    if (!homeCommandReceived && !immediateCommandPending) {
         Serial.printf("Move complete - Position: X:%ld Y_L:%ld Y_R:%ld Z:%ld\n", stepperX->getCurrentPosition(), stepperY_Left->getCurrentPosition(), stepperY_Right->getCurrentPosition(), stepperZ->getCurrentPosition()); // Updated printf
     }
 }

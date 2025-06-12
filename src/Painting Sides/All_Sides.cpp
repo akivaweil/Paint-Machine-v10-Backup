@@ -21,7 +21,7 @@ extern FastAccelStepper *stepperZ;
 extern bool isPressurePot_ON;
 extern FastAccelStepperEngine engine;
 extern FastAccelStepper *rotationStepper;
-extern StateMachine* stateMachine;
+// Function-based StateMachine - no extern needed
 extern WebSocketsServer webSocket;    // For pause loop
 
 // External references to immediate command system
@@ -304,19 +304,7 @@ void paintAllSides() {
     //! ************************************************************************
     Serial.println("Initiating homing sequence using proper homing state...");
     
-    if (stateMachine) {
-        // Change to homing state - this will properly home all axes including rotation
-        changeState(MachineState::HOMING);
-        Serial.println("Changed to homing state for proper axis positioning.");
-    } else {
-        Serial.println("ERROR: StateMachine not available for homing. Performing basic cleanup.");
-        
-        // Fallback: Stop all motors if state machine is not available
-        if (stepperX->isRunning()) stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-        if (stepperY_Left->isRunning()) stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
-        if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
-        if (rotationStepper && rotationStepper->isRunning()) {
-            rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
-        }
-    }
+    // Change to homing state - this will properly home all axes including rotation
+    changeState(MachineState::HOMING);
+    Serial.println("Changed to homing state for proper axis positioning.");
 } 

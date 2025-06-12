@@ -180,18 +180,13 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         Serial.printf("[WS] Client #%u connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
         
         // --- Send current state to newly connected client --- 
-        if (stateMachine && stateMachine->getCurrentState()) {
-            String stateMessage = "STATE:";
-            stateMessage += stateMachine->getCurrentState()->getName();
-            webSocket.sendTXT(num, stateMessage);
-            Serial.print("Sent current state to client #");
-            Serial.print(num);
-            Serial.print(": ");
-            Serial.println(stateMessage);
-        } else {
-            Serial.println("[WS] Could not send initial state: StateMachine or current state is null.");
-            webSocket.sendTXT(num, "STATE:UNKNOWN"); // Send a default
-        }
+        String stateMessage = "STATE:";
+        stateMessage += getCurrentStateName();
+        webSocket.sendTXT(num, stateMessage);
+        Serial.print("Sent current state to client #");
+        Serial.print(num);
+        Serial.print(": ");
+        Serial.println(stateMessage);
         // ------------------------------------------------------
       }
       break;

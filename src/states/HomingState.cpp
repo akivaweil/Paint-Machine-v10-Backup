@@ -33,7 +33,7 @@ extern FastAccelStepper *rotationStepper; // Declared in Rotation_Motor.h
 // bool isHoming = false; // Moved to Homing class or managed internally
 
 // Reference to the state machine
-extern StateMachine* stateMachine;
+// Function-based StateMachine - no extern needed
 
 // // Utility function to convert inches to steps - Moved to Homing class or shared location
 // long inchesToStepsXYZ(float inches) {

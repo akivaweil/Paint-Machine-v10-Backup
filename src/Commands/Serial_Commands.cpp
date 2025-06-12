@@ -280,13 +280,9 @@ void cmdVacuum(bool state) {
 void cmdStatus() {
   Serial.println("Machine Status:");
   
-  if (stateMachine && stateMachine->getCurrentState()) {
-    const char* stateName = stateMachine->getCurrentState()->getName();
-    Serial.print("Current State: ");
-    Serial.println(stateName ? stateName : "Unknown (getName failed)");
-  } else {
-    Serial.println("Current State: UNKNOWN (StateMachine unavailable)");
-  }
+  const char* stateName = getCurrentStateName();
+  Serial.print("Current State: ");
+  Serial.println(stateName ? stateName : "Unknown (getName failed)");
   
   // Display positions (these would need to be implemented elsewhere)
   // and referenced here

@@ -10,6 +10,7 @@
 #include "../../include/motors/ServoMotor.h"
 #include "../../include/web/Web_Dashboard_Commands.h"
 #include "../../include/system/StateMachine.h"
+#include <WebSocketsServer.h>     // For webSocket.loop()
 
 // External references to stepper motors
 extern FastAccelStepper *stepperX;
@@ -18,7 +19,51 @@ extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 extern ServoMotor myServo;
 extern PaintingSettings paintingSettings;
-extern StateMachine* stateMachine;
+// Function-based StateMachine - no extern needed
+extern WebSocketsServer webSocket;    // For immediate command processing
+
+// External references to immediate command system
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
+
+// Function to check for immediate commands during painting operations
+bool checkForImmediateCommandsSide2() {
+    // Process any pending WebSocket events to catch immediate commands
+    webSocket.loop();
+    
+    // Check for immediate commands
+    if (immediateCommandPending) {
+        Serial.println("*** IMMEDIATE COMMAND DETECTED during Side2 painting - ABORTING NOW! ***");
+        Serial.printf("*** Command: %s, Client: %d ***\n", pendingCommand.c_str(), pendingCommandClientNum);
+        
+        // Stop all motors immediately
+        if (stepperX && stepperX->isRunning()) {
+            Serial.println("*** FORCE STOPPING X MOTOR ***");
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        }
+        if (stepperY_Left && stepperY_Left->isRunning()) {
+            Serial.println("*** FORCE STOPPING Y_LEFT MOTOR ***");
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        }
+        if (stepperY_Right && stepperY_Right->isRunning()) {
+            Serial.println("*** FORCE STOPPING Y_RIGHT MOTOR ***");
+            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+        }
+        if (stepperZ && stepperZ->isRunning()) {
+            Serial.println("*** FORCE STOPPING Z MOTOR ***");
+            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        }
+        
+        // Turn off paint gun for safety
+        Serial.println("*** FORCE TURNING OFF PAINT GUN ***");
+        paintGun_OFF();
+        
+        return true; // Immediate command pending
+    }
+    
+    return false; // No immediate commands
+}
 
 //* ************************************************************************
 //* ************************** SIDE 2 PAINTING ***************************
@@ -129,6 +174,12 @@ void paintSide2Pattern() {
                     paintGunDeactivated = true;
                 }
                 
+                // **KEY ENHANCEMENT**: Check for immediate commands during motor movement
+                if (checkForImmediateCommandsSide2()) {
+                    Serial.println("*** Side 2 painting ABORTED due to immediate command ***");
+                    return; // Exit immediately
+                }
+                
                 // Process WebSocket events frequently during movement
                 processWebSocketEventsFrequently();
                 
@@ -178,6 +229,12 @@ void paintSide2Pattern() {
                 if (paintGunActivated && !paintGunDeactivated && elapsedSeconds >= timeToStop) {
                     paintGun_OFF();
                     paintGunDeactivated = true;
+                }
+                
+                // **KEY ENHANCEMENT**: Check for immediate commands during motor movement
+                if (checkForImmediateCommandsSide2()) {
+                    Serial.println("*** Side 2 painting ABORTED due to immediate command ***");
+                    return; // Exit immediately
                 }
                 
                 // Process WebSocket events frequently during movement
@@ -313,5 +370,5 @@ void paintSide2Pattern() {
 
     //! Transition to Homing State
     Serial.println("Side 2 painting complete. Transitioning to Homing State...");
-    stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call
+    changeState(MachineState::HOMING);
 }

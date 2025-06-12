@@ -22,7 +22,7 @@ extern void PressurePot_OFF();
 extern ServoMotor myServo;
 
 // Reference to the global state machine instance
-extern StateMachine* stateMachine;
+// Function-based StateMachine - no extern needed
 
 // Cleaning state variables
 bool cleaningInProgress = false;
@@ -68,12 +68,9 @@ void CleaningState::enter() {
     // This is called here assuming 'paintAllSides' will always start with Side 4 after cleaning.
     // If cleaning is used for other purposes, this might need more sophisticated logic
     // to determine which angle to rotate to, or if rotation is needed at all.
-    if (stateMachine && stateMachine->isTransitioningToPaintAllSides()) { // Hypothetical check
-        Serial.println("CleaningState: Initiating rotation to Side 4 angle during cleaning prep.");
-        rotateToAngle(SIDE4_ROTATION_ANGLE); // Rotate for the first side of 'paintAllSides'
-    } else {
-        Serial.println("CleaningState: Not rotating, as not transitioning to Paint All Sides or stateMachine unavailable.");
-    }
+    // Always rotate to Side 4 position during cleaning prep for paint all sides
+    Serial.println("CleaningState: Initiating rotation to Side 4 angle during cleaning prep.");
+    rotateToAngle(SIDE4_ROTATION_ANGLE);
     
     // Reset cleaning state variables
     _isCleaning = true;
@@ -123,26 +120,9 @@ void CleaningState::update() {
     
     // If cleaning is marked as complete, transition
     if (_cleaningComplete) {
-        State* overrideState = nullptr;
-        if (stateMachine) { // Check stateMachine first
-            overrideState = stateMachine->getNextStateOverrideAndClear();
-        }
-
-        if (overrideState) {
-            Serial.println("CleaningState: Short clean complete. Transitioning to override state.");
-            // shortMode = false; // Reset mode before leaving - already in exit()
-            if(stateMachine) stateMachine->changeState(overrideState);
-        } else {
-            Serial.println("CleaningState: Normal clean complete. Transitioning to Idle State.");
-            // shortMode = false; // Reset mode before leaving - already in exit()
-            if (stateMachine) {
-                 stateMachine->changeState(stateMachine->getIdleState());
-            } else {
-                Serial.println("ERROR: StateMachine pointer null. Cannot transition to Idle.");
-            }
-        }
+        Serial.println("CleaningState: Clean complete. Transitioning to Idle State.");
+        changeState(MachineState::IDLE);
         _cleaningComplete = false; // Reset for next entry
-        // shortMode = false; // Moved to exit() for robustness
     }
 }
 

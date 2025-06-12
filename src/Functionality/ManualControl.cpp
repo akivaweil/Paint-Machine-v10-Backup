@@ -15,7 +15,7 @@ extern FastAccelStepper* stepperX;
 extern FastAccelStepper* stepperY_Left; // Assuming Y_Left is representative for Y position
 extern FastAccelStepper* stepperZ;
 extern FastAccelStepper* rotationStepper; // ADDED: extern declaration for rotation stepper
-extern StateMachine* stateMachine;
+// Function-based StateMachine - no extern needed
 // extern const float STEPS_PER_DEGREE; // This is defined in motion.h, included above
 
 // Speed settings for manual movements (can be adjusted or made configurable later)
@@ -35,11 +35,7 @@ const int ANGLE_NOT_PROVIDED = INT_MIN;
 // the machine is in an appropriate state (e.g., Idle).
 
 bool canPerformManualMove() {
-    if (!stateMachine || !stateMachine->getCurrentState()) {
-        Serial.println("Error: StateMachine or current state is null in canPerformManualMove.");
-        return false;
-    }
-    const char* current_state_name = stateMachine->getCurrentState()->getName();
+    const char* current_state_name = getCurrentStateName();
     if (strcmp(current_state_name, "IDLE") == 0) {
         return true;
     }
