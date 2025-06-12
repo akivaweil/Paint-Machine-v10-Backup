@@ -19,6 +19,7 @@
 #include "storage/painting_settings.h"
 // Removed old HomingState.h include - using function-based StateMachine
 #include "system/StateMachine.h" // Function-based StateMachine
+#include "motors/homing.h" // For initializeHoming
 #include <Preferences.h>
 #include "web/Web_Dashboard_Commands.h" // For loadPnpSettingsFromNVS
 #include "hardware/GlobalDebouncers.h" // For initializeGlobalDebouncers
@@ -174,6 +175,9 @@ void initializeMotorsAndSwitches() {
 
     // Initialize global debouncers (includes PNP Cycle Sensor)
     initializeGlobalDebouncers(); 
+
+    // Initialize homing system with the steppers
+    initializeHoming(engine, stepperX, stepperY_Left, stepperY_Right, stepperZ);
 
     // Serial.println("Motors and Switches Initialized.");
 }

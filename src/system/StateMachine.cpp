@@ -3,6 +3,11 @@
 #include <WebSocketsServer.h>
 #include <FastAccelStepper.h>
 #include "motors/homing.h"
+#include "motors/PaintingSides.h"
+#include "motors/XYZ_Movements.h"
+#include "motors/servo_motor.h"
+#include "hardware/GlobalDebouncers.h"
+#include "system/GlobalState.h"
 
 // External references for immediate command system
 extern bool immediateCommandPending;
@@ -282,10 +287,35 @@ void forceToIdleState() {
 
 void enterIdleState() {
     Serial.println("Entering IDLE state");
+    
+    // Clear any lingering pause state when returning to idle
+    isPaused = false;
+    Serial.println("IdleState: Cleared pause state on entry");
+    
+    // Set servo to 180 degrees
+    setServoAngle(180);
+    Serial.println("Servo set to 180 degrees in Idle State.");
+    
+    Serial.println("Idle state active. Press PnP cycle sensor to enter PnP mode.");
 }
 
 void updateIdleState() {
-    // Idle state update logic
+    // Update the global PnP cycle sensor debouncer
+    g_pnpCycleSensorDebouncer.update();
+    
+    // Debug: Print sensor value every second
+    static unsigned long lastDebugTime = 0;
+    if (millis() - lastDebugTime > 1000) {
+        int sensorValue = g_pnpCycleSensorDebouncer.read();
+        lastDebugTime = millis();
+    }
+    
+    // Check if the PnP cycle sensor is pressed (active LOW, detected by falling edge)
+    if (g_pnpCycleSensorDebouncer.fell()) {
+        Serial.println("PnP Cycle Sensor activated (falling edge) in IdleState. Transitioning to PnPState...");
+        changeState(MachineState::PNP);
+        return;
+    }
 }
 
 void exitIdleState() {
@@ -294,12 +324,8 @@ void exitIdleState() {
 
 void enterHomingState() {
     Serial.println("Entering HOMING state");
-    // Initialize homing with the global steppers
-    extern FastAccelStepperEngine *engine;
-    extern FastAccelStepper *stepperX, *stepperY_Left, *stepperY_Right, *stepperZ;
-    initializeHoming(*engine, stepperX, stepperY_Left, stepperY_Right, stepperZ);
     
-    // Start homing process
+    // Start homing process (homing system already initialized in Setup.cpp)
     if (homeAllAxes()) {
         Serial.println("Homing completed successfully - transitioning to IDLE");
         changeState(MachineState::IDLE);
@@ -320,14 +346,69 @@ void exitHomingState() {
 
 void enterPaintingState() {
     Serial.println("Entering PAINTING state");
+    
+    // Clear any lingering pause state from previous cycles
+    isPaused = false;
+    Serial.println("PaintingState: Cleared pause state for new painting cycle");
+    
+    // Start painting all sides directly
+    Serial.println("PaintingState: Starting 'All Sides' painting routine.");
+    paintAllSides(); // This is a blocking call
+    Serial.println("PaintingState: All Sides Painting routine finished.");
+    
+    // Move to position before homing
+    Serial.println("PaintingState: Moving to position (1,1,0) before Homing.");
+    long xPos = (long)(1.0 * STEPS_PER_INCH_XYZ);
+    long yPos = (long)(1.0 * STEPS_PER_INCH_XYZ);
+    long zPos = 0;
+    
+    moveToXYZ(xPos, DEFAULT_X_SPEED, yPos, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
+    Serial.println("PaintingState: Reached position (1,1,0).");
+    
+    // Transition to homing
+    Serial.println("PaintingState: Sequence complete. Requesting Homing State.");
+    changeState(MachineState::HOMING);
 }
 
 void updatePaintingState() {
-    // Painting state update logic
+    // Painting logic is handled in enterPaintingState() as a blocking operation
+    // This function is called during the painting process for immediate command checking
+    
+    // Check for immediate commands that should interrupt painting
+    extern bool immediateCommandPending;
+    if (immediateCommandPending) {
+        Serial.println("PaintingState: Immediate command detected - interrupting painting process");
+        
+        // Stop any running motors immediately
+        extern FastAccelStepper *stepperX, *stepperY_Left, *stepperY_Right, *stepperZ;
+        if (stepperX && stepperX->isRunning()) {
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        }
+        if (stepperY_Left && stepperY_Left->isRunning()) {
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        }
+        if (stepperY_Right && stepperY_Right->isRunning()) {
+            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+        }
+        if (stepperZ && stepperZ->isRunning()) {
+            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        }
+        
+        // Turn off paint gun for safety
+        extern void paintGun_OFF();
+        paintGun_OFF();
+        
+        // Let the main loop handle the immediate command
+        return;
+    }
 }
 
 void exitPaintingState() {
     Serial.println("Exiting PAINTING state");
+    
+    // Turn off paint gun for safety
+    extern void paintGun_OFF();
+    paintGun_OFF();
 }
 
 void enterPnPState() {
