@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include "utils/Serial_Commands.h"
-// #include "system/machine_state.h" // No longer needed
+#include "system/StateMachine.h"
 #include "utils/settings.h"
 #include "system/StateMachine.h" // Needed for state access
 
 // Reference to the global state machine instance
-extern StateMachine* stateMachine;
+// Using function-based state machine - no external object needed
 
 // Function declarations for commands
 void cmdHome();
@@ -280,13 +280,9 @@ void cmdVacuum(bool state) {
 void cmdStatus() {
   Serial.println("Machine Status:");
   
-  if (stateMachine && stateMachine->getCurrentState()) {
-    const char* stateName = stateMachine->getCurrentState()->getName();
-    Serial.print("Current State: ");
-    Serial.println(stateName ? stateName : "Unknown (getName failed)");
-  } else {
-    Serial.println("Current State: UNKNOWN (StateMachine unavailable)");
-  }
+  const char* stateName = getCurrentStateName();
+  Serial.print("Current State: ");
+  Serial.println(stateName);
   
   // Display positions (these would need to be implemented elsewhere)
   // and referenced here

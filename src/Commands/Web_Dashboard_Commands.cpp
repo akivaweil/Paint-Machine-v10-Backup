@@ -1745,8 +1745,7 @@ void setupWebDashboardCommands() {
     Serial.printf("Pressure Pot Pin %d initialized as OUTPUT and set to LOW.\n", PRESSURE_POT_PIN);
 }
 
-// External references to global variables
-extern StateMachine* stateMachine;
+// Using function-based state machine
 extern bool isPaused;
 
 // Add global flag for immediate command execution

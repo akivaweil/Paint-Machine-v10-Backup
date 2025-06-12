@@ -21,7 +21,7 @@ extern FastAccelStepper *stepperZ;
 extern bool isPressurePot_ON;
 extern FastAccelStepperEngine engine;
 extern FastAccelStepper *rotationStepper;
-extern StateMachine* stateMachine;
+// Using function-based state machine
 extern WebSocketsServer webSocket;    // For pause loop
 
 // External references to immediate command system

@@ -15,7 +15,7 @@ extern FastAccelStepper* stepperX;
 extern FastAccelStepper* stepperY_Left; // Assuming Y_Left is representative for Y position
 extern FastAccelStepper* stepperZ;
 extern FastAccelStepper* rotationStepper; // ADDED: extern declaration for rotation stepper
-extern StateMachine* stateMachine;
+// Using function-based state machine
 // extern const float STEPS_PER_DEGREE; // This is defined in motion.h, included above
 
 // Speed settings for manual movements (can be adjusted or made configurable later)

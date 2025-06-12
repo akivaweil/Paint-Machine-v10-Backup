@@ -19,7 +19,7 @@ extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 extern ServoMotor myServo;
 extern PaintingSettings paintingSettings; // Make sure global instance is accessible
-extern StateMachine* stateMachine; // Declare external state machine instance
+// Using function-based state machine
 extern WebSocketsServer webSocket;    // For immediate command processing
 
 // External references to immediate command system

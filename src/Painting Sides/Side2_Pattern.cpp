@@ -18,7 +18,7 @@ extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 extern ServoMotor myServo;
 extern PaintingSettings paintingSettings;
-extern StateMachine* stateMachine;
+// Using function-based state machine
 
 //* ************************************************************************
 //* ************************** SIDE 2 PAINTING ***************************
