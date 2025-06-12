@@ -7,7 +7,7 @@
 #include "motors/XYZ_Movements.h"
 #include "utils/settings.h"
 #include <FastAccelStepper.h>
-#include "motors/Homing.h"
+#include "motors/homing.h"
 #include "motors/Rotation_Motor.h"
 #include "system/StateMachine.h"
 #include "system/GlobalState.h"    // For isPaused

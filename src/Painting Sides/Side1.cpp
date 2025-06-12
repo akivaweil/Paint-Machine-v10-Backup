@@ -8,7 +8,7 @@
 #include "storage/painting_settings.h" // Function-based painting settings
 #include "../../include/settings/painting.h"         // For painting-specific constants (SIDE1_Z_HEIGHT etc.)
 #include "motors/servo_motor.h"         // For ServoMotor class
-#include "states/PaintingState.h" // Correct filename
+// Removed old PaintingState.h include - using function-based StateMachine
 #include "settings/pins.h"        // Keep this one
 #include "../../include/web/Web_Dashboard_Commands.h" // For checkForHomeCommand
 #include "../../include/system/StateMachine.h" // Include StateMachine header

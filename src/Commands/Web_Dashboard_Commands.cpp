@@ -25,10 +25,9 @@
 #include "web/Web_Dashboard_Commands.h" // Corrected Path to header
 #include <ArduinoJson.h>
 #include "config.h" // Assuming this is directly under include/
-#include "states/IdleState.h" // Include IdleState for comparison
+// Removed old IdleState.h include - using function-based StateMachine
 #include "settings/motion.h" // Include for default PNP values
-#include "states/CleaningState.h" // Include for setShortMode
-#include "states/InspectTipState.h" // Include for InspectTipState
+// Removed old CleaningState.h and InspectTipState.h includes - using function-based StateMachine
 #include <limits.h> // ADDED For LONG_MIN, INT_MIN
 #include "system/GlobalState.h" // ADDED for isPaused and isActivePainting
 

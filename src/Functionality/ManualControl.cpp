@@ -3,7 +3,7 @@
 #include "motors/XYZ_Movements.h"
 #include "motors/servo_motor.h"
 #include "system/StateMachine.h"
-#include "states/State.h" // Required for state->getName()
+// Removed old State.h include - using function-based StateMachine
 #include <FastAccelStepper.h> // Required for stepper->getCurrentPosition()
 #include "motors/Rotation_Motor.h" // ADDED for tray rotation
 #include "settings/motion.h" // ADDED for STEPS_PER_DEGREE

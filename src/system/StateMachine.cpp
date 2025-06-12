@@ -2,6 +2,7 @@
 #include "system/StateMachine.h"
 #include <WebSocketsServer.h>
 #include <FastAccelStepper.h>
+#include "motors/homing.h"
 
 // External references for immediate command system
 extern bool immediateCommandPending;
@@ -293,10 +294,24 @@ void exitIdleState() {
 
 void enterHomingState() {
     Serial.println("Entering HOMING state");
+    // Initialize homing with the global steppers
+    extern FastAccelStepperEngine *engine;
+    extern FastAccelStepper *stepperX, *stepperY_Left, *stepperY_Right, *stepperZ;
+    initializeHoming(*engine, stepperX, stepperY_Left, stepperY_Right, stepperZ);
+    
+    // Start homing process
+    if (homeAllAxes()) {
+        Serial.println("Homing completed successfully - transitioning to IDLE");
+        changeState(MachineState::IDLE);
+    } else {
+        Serial.println("Homing failed - staying in HOMING state");
+        // Could transition to error state or retry
+    }
 }
 
 void updateHomingState() {
-    // Homing state update logic
+    // Homing is handled in enterHomingState() - this is just a placeholder
+    // The homing process is blocking, so we don't need continuous updates
 }
 
 void exitHomingState() {

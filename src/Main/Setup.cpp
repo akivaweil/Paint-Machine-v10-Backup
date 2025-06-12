@@ -17,7 +17,7 @@
 #include "motors/Rotation_Motor.h"
 #include "storage/persistence.h"
 #include "storage/painting_settings.h"
-#include "states/HomingState.h"
+// Removed old HomingState.h include - using function-based StateMachine
 #include "system/StateMachine.h" // Function-based StateMachine
 #include <Preferences.h>
 #include "web/Web_Dashboard_Commands.h" // For loadPnpSettingsFromNVS
