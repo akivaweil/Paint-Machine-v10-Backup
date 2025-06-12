@@ -24,6 +24,11 @@ extern FastAccelStepper *rotationStepper;
 extern StateMachine* stateMachine;
 extern WebSocketsServer webSocket;    // For pause loop
 
+// External references to immediate command system
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
+
 // Global variable definition for requested coats
 int g_requestedCoats = 3; // Default to 3 coats
 int g_interCoatDelaySeconds = 10; // Default 10 seconds delay
@@ -46,6 +51,43 @@ const unsigned int CLEANING_Z_SPEED = 4000;
 // Define the loading bar X position as a constant to ensure consistency
 const float LOADING_BAR_X_START = 24.0f;
 const float LOADING_BAR_X_END = 0.0f;
+
+// Function to check for immediate commands during painting operations
+bool checkForImmediateCommands() {
+    // Process any pending WebSocket events to catch immediate commands
+    webSocket.loop();
+    
+    // Check for immediate commands
+    if (immediateCommandPending) {
+        Serial.println("IMMEDIATE COMMAND detected during painting - aborting current operation");
+        
+        // Stop all motors immediately
+        if (stepperX && stepperX->isRunning()) {
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        }
+        if (stepperY_Left && stepperY_Left->isRunning()) {
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        }
+        if (stepperY_Right && stepperY_Right->isRunning()) {
+            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+        }
+        if (stepperZ && stepperZ->isRunning()) {
+            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        }
+        
+        // Turn off paint gun for safety
+        paintGun_OFF();
+        
+        return true; // Immediate command pending
+    }
+    
+    // Also check for home command for backward compatibility
+    if (checkForPauseCommand()) {
+        return true;
+    }
+    
+    return false; // No immediate commands
+}
 
 // Helper function to prepare for the next painting sequence
 void _prepareForPaintingSequence() {
@@ -74,10 +116,13 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     //! STEP 1: Paint left side (Side 4)
     Serial.print("Starting Left Side (Side 4) ("); Serial.print(runLabel); Serial.println(")");
     while (isPaused) { webSocket.loop(); delay(100); }
-    // Process WebSocket events immediately before starting side painting
-    processWebSocketEvents();
+    // Check for immediate commands before starting side painting
+    if (checkForImmediateCommands()) {
+        Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", before left side due to immediate command)");
+        return false;
+    }
     paintSide4Pattern();
-    if (checkForPauseCommand()) {
+    if (checkForImmediateCommands()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after left side)");
         return false;
     }
@@ -85,10 +130,13 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     //! STEP 2: Paint back side (Side 3)
     Serial.print("Starting Back Side (Side 3) ("); Serial.print(runLabel); Serial.println(")");
     while (isPaused) { webSocket.loop(); delay(100); }
-    // Process WebSocket events immediately before starting side painting
-    processWebSocketEvents();
+    // Check for immediate commands before starting side painting
+    if (checkForImmediateCommands()) {
+        Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", before back side due to immediate command)");
+        return false;
+    }
     paintSide3Pattern();
-    if (checkForPauseCommand()) {
+    if (checkForImmediateCommands()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after back side)");
         return false;
     }
@@ -96,10 +144,13 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     //! STEP 3: Paint right side (Side 2)
     Serial.print("Starting Right Side (Side 2) ("); Serial.print(runLabel); Serial.println(")");
     while (isPaused) { webSocket.loop(); delay(100); }
-    // Process WebSocket events immediately before starting side painting
-    processWebSocketEvents();
+    // Check for immediate commands before starting side painting
+    if (checkForImmediateCommands()) {
+        Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", before right side due to immediate command)");
+        return false;
+    }
     paintSide2Pattern();
-    if (checkForPauseCommand()) {
+    if (checkForImmediateCommands()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after right side)");
         return false;
     }
@@ -107,10 +158,13 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
     //! STEP 4: Paint front side (Side 1)
     Serial.print("Starting Front Side (Side 1) ("); Serial.print(runLabel); Serial.println(")");
     while (isPaused) { webSocket.loop(); delay(100); }
-    // Process WebSocket events immediately before starting side painting
-    processWebSocketEvents();
+    // Check for immediate commands before starting side painting
+    if (checkForImmediateCommands()) {
+        Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", before front side due to immediate command)");
+        return false;
+    }
     paintSide1Pattern();
-    if (checkForPauseCommand()) {
+    if (checkForImmediateCommands()) {
         Serial.print("All Sides Painting ABORTED ("); Serial.print(runLabel); Serial.println(", after front side)");
         return false;
     }
@@ -124,10 +178,10 @@ bool _executeSinglePaintAllSidesSequence(const char* runLabel) {
         
         unsigned long pressureStartTime = millis();
         while (millis() - pressureStartTime < 1000) {
-            if (checkForPauseCommand()) {
+            if (checkForImmediateCommands()) {
                 Serial.print("All Sides Painting ABORTED (");
                 Serial.print(runLabel);
-                Serial.println(", during pressure pot pressurization)");
+                Serial.println(", during pressure pot pressurization due to immediate command)");
                 return false;
             }
             delay(10);
@@ -186,8 +240,8 @@ void paintAllSides() {
         stepperX->moveTo(target_x_start_loading_bar_steps);
         
         while (stepperX->isRunning()) {
-            if (checkForPauseCommand()) {
-                Serial.printf("Home command during move to loading bar start before coat %d. Process terminated.\n", coat + 1);
+            if (checkForImmediateCommands()) {
+                Serial.printf("Immediate command during move to loading bar start before coat %d. Process terminated.\n", coat + 1);
                 stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
                 return;
             }
@@ -204,8 +258,8 @@ void paintAllSides() {
             Serial.printf("Loading bar (%d) fallback: Simple timed wait for %d s.\n", coat, g_interCoatDelaySeconds);
             unsigned long simpleDelayStartTime = millis();
             while (millis() - simpleDelayStartTime < (unsigned long)g_interCoatDelaySeconds * 1000) {
-                if (checkForPauseCommand()) {
-                    Serial.printf("Home command during fallback wait (%d). Process terminated.\n", coat);
+                if (checkForImmediateCommands()) {
+                    Serial.printf("Immediate command during fallback wait (%d). Process terminated.\n", coat);
                     return;
                 }
                 delay(10); 
@@ -223,8 +277,8 @@ void paintAllSides() {
             stepperX->moveTo(target_x_end_loading_bar_steps);
 
             while (stepperX->isRunning()) {
-                if (checkForPauseCommand()) {
-                    Serial.printf("Home command during loading bar (%d). Process terminated.\n", coat);
+                if (checkForImmediateCommands()) {
+                    Serial.printf("Immediate command during loading bar (%d). Process terminated.\n", coat);
                     stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
                     return;
                 }

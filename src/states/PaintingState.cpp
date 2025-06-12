@@ -25,6 +25,11 @@ extern FastAccelStepper* stepperY_Left;
 extern FastAccelStepper* stepperY_Right;
 extern FastAccelStepper* stepperZ;
 
+// External references to immediate command system
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
+
 //* ************************************************************************
 //* ************************* PAINTING STATE ***************************
 //* ************************************************************************
@@ -59,6 +64,31 @@ void PaintingState::enter() {
 }
 
 void PaintingState::update() {
+    // Check for immediate commands that should interrupt painting
+    if (immediateCommandPending) {
+        Serial.println("PaintingState: Immediate command detected - interrupting painting process");
+        
+        // Stop any running motors immediately
+        if (stepperX && stepperX->isRunning()) {
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        }
+        if (stepperY_Left && stepperY_Left->isRunning()) {
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        }
+        if (stepperY_Right && stepperY_Right->isRunning()) {
+            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+        }
+        if (stepperZ && stepperZ->isRunning()) {
+            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        }
+        
+        // Turn off paint gun for safety
+        paintGun_OFF();
+        
+        // Let the main loop handle the immediate command
+        return;
+    }
+    
     // Declare variables outside of switch statement
     long xPos, yPos, zPos;
     

@@ -1,7 +1,7 @@
-#ifndef STATEMACHINE_H
-#define STATEMACHINE_H
+#ifndef STATE_MACHINE_H
+#define STATE_MACHINE_H
 
-#include "states/State.h"          // Base State class
+#include "states/State.h"
 #include "states/HomingState.h"
 #include "states/PaintingState.h"
 #include "states/CleaningState.h"
@@ -37,7 +37,7 @@ public:
 
     // Flag and methods for 'paint all sides' transition
     void setTransitioningToPaintAllSides(bool value);
-    bool isTransitioningToPaintAllSides() const; // No longer clears flag
+    bool isTransitioningToPaintAllSides() const;
     void clearTransitioningToPaintAllSidesFlag();
 
 private:
@@ -49,8 +49,8 @@ private:
     State* pausedState;
     State* pnpState;
     State* inspectTipState;
-    State* nextStateOverride; // Added for sub-routine returns
-    bool _isTransitioningToPaintAllSides; // Flag for paint all sides transition
+    State* nextStateOverride;
+    bool _isTransitioningToPaintAllSides;
 };
 
-#endif // STATEMACHINE_H 
+#endif // STATE_MACHINE_H 

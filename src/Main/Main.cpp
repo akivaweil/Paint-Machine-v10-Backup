@@ -4,14 +4,16 @@
 #include "utils/machine_state.h"
 #include <ArduinoOTA.h>
 #include <WebSocketsServer.h>
-#include "system/StateMachine.h"
+#include "system/StateMachine.h"  // Now in include directory!
 #include "motors/ServoMotor.h"
 #include "storage/Persistence.h"
 #include "storage/PaintingSettings.h"
 
 // Include headers for functions called in loop
 #include "web/Web_Dashboard_Commands.h" // For runDashboardServer()
-// Add other headers as needed
+
+// State machine
+extern StateMachine* stateMachine;
 
 extern WebSocketsServer webSocket;
 extern bool webSocketServerStarted;
@@ -24,18 +26,23 @@ const int servoPin = 4;
 ServoMotor myServo(servoPin);
 extern PaintingSettings paintingSettings;
 
-// State machine
-extern StateMachine* stateMachine;
-
 // Define the global flag previously in machine_state.cpp
 volatile bool homeCommandReceived = false;
+
+// Add global flag for immediate command execution (remove volatile for String)
+bool immediateCommandPending = false;
+String pendingCommand = "";
+uint8_t pendingCommandClientNum = 0;
+
+// Forward declaration for immediate command processing
+void processImmediateCommand();
 
 //* ************************************************************************
 //* ***************************** MAIN *******************************
 //* ************************************************************************
 
 void setup() {
-  // Initialize state machine *before* system initialization, so it's available
+  // Initialize class-based state machine *before* system initialization
   stateMachine = new StateMachine();
 
   initializeSystem();
@@ -47,26 +54,44 @@ void setup() {
   Serial.printf("Servo Initialized at: %d degrees\n", initialServoAngle);
 
   // Any setup code that *must* run after initializeSystem()
-  Serial.println("Setup complete. Entering main loop...");
+  Serial.println("Setup complete. Enhanced immediate command processing ready!");
 }
 
 void loop() {
   // Handle OTA updates
   ArduinoOTA.handle();
   
-  // Update machine state
-  // updateMachineState();
+  // **REVOLUTIONARY CHANGE**: Process WebSocket events MULTIPLE times per loop
+  runDashboardServer(); // Now processes WebSocket events 15+ times per call!
   
-  // Update state machine
+  // Update enhanced state machine with immediate command processing
   if (stateMachine) {
     stateMachine->update();
   }
   
-  //! Handle web server and WebSocket communication
-  runDashboardServer(); // Handles incoming client connections and WebSocket messages
+  // **ADDITIONAL WebSocket processing** after state update for maximum responsiveness
+  webSocket.loop();
+  webSocket.loop();
   
-  // Add calls to other main loop functions here
-  // For example, state machine updates, periodic checks, etc.
+  // **ENHANCED ARCHITECTURE**: Main loop now processes WebSocket events 17+ times per iteration
+  // Combined with aggressive processing during painting operations for immediate responses
   
-  delay(1); // Small delay to prevent tight loop, adjust as necessary
+  delay(1); // Minimal delay - main loop now runs hundreds of times per second
+}
+
+//* ************************************************************************
+//* ******************** IMMEDIATE COMMAND PROCESSING ******************
+//* ************************************************************************
+
+void processImmediateCommand() {
+  Serial.print("Processing immediate command: ");
+  Serial.println(pendingCommand);
+  
+  // Process the command immediately by calling the WebSocket command processor directly
+  extern void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandPayload);
+  processWebCommand(&webSocket, pendingCommandClientNum, pendingCommand);
+  
+  // Clear the pending command
+  pendingCommand = "";
+  pendingCommandClientNum = 0;
 }

@@ -224,6 +224,35 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     // Add timestamp for debugging command processing timing
     Serial.print("[DEBUG] Processing command at: ");
     Serial.println(millis());
+    
+    // Check if this is an immediate command that should interrupt current operations
+    String baseCommand = commandPayload;
+    int baseColonIndex = baseCommand.indexOf(':');
+    if (baseColonIndex != -1) {
+        baseCommand = baseCommand.substring(0, baseColonIndex);
+    }
+    baseCommand.toUpperCase();
+    
+    // If it's an immediate command and we're not already in idle state, flag for immediate processing
+    if (isImmediateCommand(baseCommand) && stateMachine && 
+        stateMachine->getCurrentState() != stateMachine->getIdleState()) {
+        Serial.print("IMMEDIATE COMMAND DETECTED: ");
+        Serial.println(baseCommand);
+        
+        // Set the immediate command flags
+        immediateCommandPending = true;
+        pendingCommand = commandPayload;
+        pendingCommandClientNum = num;
+        
+        // Also process immediately if it's a critical safety command
+        if (baseCommand == "HOME" || baseCommand == "HOME_ALL" || 
+            baseCommand == "PAUSE" || baseCommand == "PAINT_GUN_OFF") {
+            Serial.println("CRITICAL SAFETY COMMAND - Processing immediately");
+            // Process critical commands immediately for safety
+        }
+        
+        return; // Don't process normally, let main loop handle it
+    }
 
     String commandToProcess = commandPayload; // This will hold the actual command string for colon-parsing
 
@@ -1640,11 +1669,21 @@ void runDashboardServer() {
     // Ensure WebSocket is running if WiFi is connected
     ensureWebSocketRunning();
     
-    // Handle WebSocket events first to keep it responsive
-    webSocket.loop();
-
+    // **REVOLUTIONARY CHANGE**: Process WebSocket events MULTIPLE times per call
+    // This ensures immediate command processing even during long painting operations
+    for (int i = 0; i < 10; i++) {
+        webSocket.loop();
+    }
+    
     // Handle client requests
     handleDashboardClient();
+    
+    // **AGGRESSIVE WebSocket processing** after HTTP handling
+    for (int i = 0; i < 5; i++) {
+        webSocket.loop();
+    }
+    
+    // No delay here - let main loop control timing for maximum responsiveness
 }
 
 void stopDashboardServer() {
@@ -1704,4 +1743,29 @@ void setupWebDashboardCommands() {
     pinMode(PRESSURE_POT_PIN, OUTPUT);
     digitalWrite(PRESSURE_POT_PIN, LOW); // Ensure pressure pot is off initially
     Serial.printf("Pressure Pot Pin %d initialized as OUTPUT and set to LOW.\n", PRESSURE_POT_PIN);
+}
+
+// External references to global variables
+extern StateMachine* stateMachine;
+extern bool isPaused;
+
+// Add global flag for immediate command execution
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
+
+// List of commands that should be executed immediately, interrupting current operations
+const String IMMEDIATE_COMMANDS[] = {
+    "HOME", "HOME_ALL", "PAUSE", "RESUME", "CLEAN_GUN", 
+    "PAINT_GUN_ON", "PAINT_GUN_OFF", "PRESSURE_POT_ON", "PRESSURE_POT_OFF"
+};
+const int NUM_IMMEDIATE_COMMANDS = sizeof(IMMEDIATE_COMMANDS) / sizeof(IMMEDIATE_COMMANDS[0]);
+
+bool isImmediateCommand(const String& command) {
+    for (int i = 0; i < NUM_IMMEDIATE_COMMANDS; i++) {
+        if (command.equalsIgnoreCase(IMMEDIATE_COMMANDS[i])) {
+            return true;
+        }
+    }
+    return false;
 }

@@ -10,6 +10,7 @@
 #include "../../include/motors/ServoMotor.h"         // For ServoMotor class
 #include "../../include/web/Web_Dashboard_Commands.h" // For checkForHomeCommand
 #include "../../include/system/StateMachine.h" // Include StateMachine header
+#include <WebSocketsServer.h>     // For webSocket.loop()
 
 // External references to stepper motors
 extern FastAccelStepper *stepperX;
@@ -19,6 +20,58 @@ extern FastAccelStepper *stepperZ;
 extern ServoMotor myServo;
 extern PaintingSettings paintingSettings; // Make sure global instance is accessible
 extern StateMachine* stateMachine; // Declare external state machine instance
+extern WebSocketsServer webSocket;    // For immediate command processing
+
+// External references to immediate command system
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
+
+// Function to check for immediate commands during painting operations
+bool checkForImmediateCommandsSide3() {
+    // Process any pending WebSocket events to catch immediate commands
+    webSocket.loop();
+    
+    // DEBUG: Print status every 100 calls
+    static int debugCounter = 0;
+    debugCounter++;
+    if (debugCounter % 100 == 0) {
+        Serial.printf("DEBUG: CheckImmediate call #%d, immediateCommandPending=%s\n", 
+                     debugCounter, immediateCommandPending ? "TRUE" : "FALSE");
+    }
+    
+    // Check for immediate commands
+    if (immediateCommandPending) {
+        Serial.println("*** IMMEDIATE COMMAND DETECTED during Side3 painting - ABORTING NOW! ***");
+        Serial.printf("*** Command: %s, Client: %d ***\n", pendingCommand.c_str(), pendingCommandClientNum);
+        
+        // Stop all motors immediately
+        if (stepperX && stepperX->isRunning()) {
+            Serial.println("*** FORCE STOPPING X MOTOR ***");
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        }
+        if (stepperY_Left && stepperY_Left->isRunning()) {
+            Serial.println("*** FORCE STOPPING Y_LEFT MOTOR ***");
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        }
+        if (stepperY_Right && stepperY_Right->isRunning()) {
+            Serial.println("*** FORCE STOPPING Y_RIGHT MOTOR ***");
+            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+        }
+        if (stepperZ && stepperZ->isRunning()) {
+            Serial.println("*** FORCE STOPPING Z MOTOR ***");
+            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        }
+        
+        // Turn off paint gun for safety
+        Serial.println("*** FORCE TURNING OFF PAINT GUN ***");
+        paintGun_OFF();
+        
+        return true; // Immediate command pending
+    }
+    
+    return false; // No immediate commands
+}
 
 //* ************************************************************************
 //* **************************** SIDE 3 PAINTING ****************************
@@ -45,7 +98,7 @@ extern StateMachine* stateMachine; // Declare external state machine instance
 
 // Function to paint the side 3 pattern
 void paintSide3Pattern() {
-    Serial.println("Starting Side 3 Pattern Painting (Horizontal Sweeps)");
+    Serial.println("Starting Side 3 Pattern Painting (Horizontal Sweeps) - WITH IMMEDIATE COMMAND SUPPORT");
 
     int servoAngle = paintingSettings.getServoAngleSide3();
 
@@ -89,7 +142,7 @@ void paintSide3Pattern() {
     long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 
     // First sweep: X- direction with smooth motion
-    Serial.println("Side 3 Pattern: First sweep X- with smooth paint gun control");
+    Serial.println("Side 3 Pattern: First sweep X- with smooth paint gun control + IMMEDIATE COMMAND SUPPORT");
     
     long finalX1 = currentX - sweepX_steps;
     float totalDistance1 = (float)sweepX_steps / STEPS_PER_INCH_XYZ;
@@ -117,24 +170,26 @@ void paintSide3Pattern() {
             paintGunDeactivated1 = true;
         }
         
-        // Process WebSocket events frequently during movement
-        processWebSocketEventsFrequently();
+        // **REVOLUTIONARY CHANGE**: Call the full dashboard server function
+        // This processes WebSocket events 15+ times per iteration!
+        runDashboardServer();
         
-        if (checkForPauseCommand()) {
-            stepperX->forceStop();
-            paintGun_OFF();
-            Serial.println("Side 3 Pattern Painting ABORTED due to home command");
-            return;
+        // NEW: Check for immediate commands during motor movement
+        if (checkForImmediateCommandsSide3()) {
+            Serial.println("*** Side 3 Sweep 1 ABORTED due to immediate command ***");
+            return; // Exit immediately
         }
+        
+        // Shorter delay for more responsive checking
         delay(1);
     }
     
     paintGun_OFF();
     currentX = finalX1;
 
-    if (checkForPauseCommand()) {
-        moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
-        Serial.println("Side 3 Pattern Painting ABORTED due to home command");
+    // Check for immediate commands after sweep
+    if (checkForImmediateCommandsSide3()) {
+        Serial.println("Side 3 Pattern Painting ABORTED due to immediate command after sweep 1");
         return;
     }
 
@@ -144,7 +199,7 @@ void paintSide3Pattern() {
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
 
     // Second sweep: X+ direction with smooth motion
-    Serial.println("Side 3 Pattern: Second sweep X+ with smooth paint gun control");
+    Serial.println("Side 3 Pattern: Second sweep X+ with smooth paint gun control + IMMEDIATE COMMAND SUPPORT");
     
     long finalX2 = currentX + sweepX_steps;
     float totalDistance2 = (float)sweepX_steps / STEPS_PER_INCH_XYZ;
@@ -172,20 +227,26 @@ void paintSide3Pattern() {
             paintGunDeactivated2 = true;
         }
         
-        // Process WebSocket events frequently during movement
-        processWebSocketEventsFrequently();
+        // **REVOLUTIONARY CHANGE**: Call the full dashboard server function
+        runDashboardServer();
         
-        if (checkForPauseCommand()) {
-            stepperX->forceStop();
-            paintGun_OFF();
-            Serial.println("Side 3 Pattern Painting ABORTED due to home command");
-            return;
+        // NEW: Check for immediate commands during motor movement
+        if (checkForImmediateCommandsSide3()) {
+            Serial.println("*** Side 3 Sweep 2 ABORTED due to immediate command ***");
+            return; // Exit immediately
         }
+        
         delay(1);
     }
     
     paintGun_OFF();
     currentX = finalX2;
+
+    // Check for immediate commands after sweep
+    if (checkForImmediateCommandsSide3()) {
+        Serial.println("Side 3 Pattern Painting ABORTED due to immediate command after sweep 2");
+        return;
+    }
 
     // Second shift: Y- direction
     Serial.println("Side 3 Pattern: Shift Y-");
@@ -193,7 +254,7 @@ void paintSide3Pattern() {
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
 
     // Third sweep: X- direction with smooth motion
-    Serial.println("Side 3 Pattern: Third sweep X- with smooth paint gun control");
+    Serial.println("Side 3 Pattern: Third sweep X- with smooth paint gun control + IMMEDIATE COMMAND SUPPORT");
     
     long finalX3 = currentX - sweepX_steps;
     float totalDistance3 = (float)sweepX_steps / STEPS_PER_INCH_XYZ;
@@ -221,20 +282,26 @@ void paintSide3Pattern() {
             paintGunDeactivated3 = true;
         }
         
-        // Process WebSocket events frequently during movement
-        processWebSocketEventsFrequently();
+        // **REVOLUTIONARY CHANGE**: Call the full dashboard server function
+        runDashboardServer();
         
-        if (checkForPauseCommand()) {
-            stepperX->forceStop();
-            paintGun_OFF();
-            Serial.println("Side 3 Pattern Painting ABORTED due to home command");
-            return;
+        // NEW: Check for immediate commands during motor movement
+        if (checkForImmediateCommandsSide3()) {
+            Serial.println("*** Side 3 Sweep 3 ABORTED due to immediate command ***");
+            return; // Exit immediately
         }
+        
         delay(1);
     }
     
     paintGun_OFF();
     currentX = finalX3;
+
+    // Check for immediate commands after sweep
+    if (checkForImmediateCommandsSide3()) {
+        Serial.println("Side 3 Pattern Painting ABORTED due to immediate command after sweep 3");
+        return;
+    }
 
     // Third shift: Y- direction
     Serial.println("Side 3 Pattern: Shift Y-");
@@ -242,7 +309,7 @@ void paintSide3Pattern() {
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
 
     // Fourth sweep: X+ direction with smooth motion
-    Serial.println("Side 3 Pattern: Fourth sweep X+ with smooth paint gun control");
+    Serial.println("Side 3 Pattern: Fourth sweep X+ with smooth paint gun control + IMMEDIATE COMMAND SUPPORT");
     
     long finalX4 = currentX + sweepX_steps;
     float totalDistance4 = (float)sweepX_steps / STEPS_PER_INCH_XYZ;
@@ -270,20 +337,26 @@ void paintSide3Pattern() {
             paintGunDeactivated4 = true;
         }
         
-        // Process WebSocket events frequently during movement
-        processWebSocketEventsFrequently();
+        // **REVOLUTIONARY CHANGE**: Call the full dashboard server function
+        runDashboardServer();
         
-        if (checkForPauseCommand()) {
-            stepperX->forceStop();
-            paintGun_OFF();
-            Serial.println("Side 3 Pattern Painting ABORTED due to home command");
-            return;
+        // NEW: Check for immediate commands during motor movement
+        if (checkForImmediateCommandsSide3()) {
+            Serial.println("*** Side 3 Sweep 4 ABORTED due to immediate command ***");
+            return; // Exit immediately
         }
+        
         delay(1);
     }
     
     paintGun_OFF();
     currentX = finalX4;
+
+    // Check for immediate commands after sweep
+    if (checkForImmediateCommandsSide3()) {
+        Serial.println("Side 3 Pattern Painting ABORTED due to immediate command after sweep 4");
+        return;
+    }
 
     // Fourth shift: Y- direction
     Serial.println("Side 3 Pattern: Shift Y-");
@@ -291,7 +364,7 @@ void paintSide3Pattern() {
     moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
 
     // Fifth sweep: X- direction (Final X painting movement) with smooth motion
-    Serial.println("Side 3 Pattern: Fifth sweep X- with smooth paint gun control");
+    Serial.println("Side 3 Pattern: Fifth sweep X- with smooth paint gun control + IMMEDIATE COMMAND SUPPORT");
     Serial.printf("Side 3 Pattern: Applying 75%% speed for final X sweep: %ld\n", final_sweep_paint_x_speed_side3);
     
     long finalX5 = currentX - sweepX_steps;
@@ -320,24 +393,24 @@ void paintSide3Pattern() {
             paintGunDeactivated5 = true;
         }
         
-        // Process WebSocket events frequently during movement
-        processWebSocketEventsFrequently();
+        // **REVOLUTIONARY CHANGE**: Call the full dashboard server function
+        runDashboardServer();
         
-        if (checkForPauseCommand()) {
-            stepperX->forceStop();
-            paintGun_OFF();
-            Serial.println("Side 3 Pattern Painting ABORTED due to home command");
-            return;
+        // NEW: Check for immediate commands during motor movement
+        if (checkForImmediateCommandsSide3()) {
+            Serial.println("*** Side 3 Sweep 5 ABORTED due to immediate command ***");
+            return; // Exit immediately
         }
+        
         delay(1);
     }
     
     paintGun_OFF();
     currentX = finalX5;
 
-    if (checkForPauseCommand()) {
-        moveToXYZ(currentX, DEFAULT_X_SPEED, currentY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
-        Serial.println("Side 3 Pattern Painting ABORTED due to home command");
+    // Final check for immediate commands
+    if (checkForImmediateCommandsSide3()) {
+        Serial.println("Side 3 Pattern Painting ABORTED due to immediate command after final sweep");
         return;
     }
 

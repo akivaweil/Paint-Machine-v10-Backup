@@ -7,6 +7,7 @@
 #include "system/StateMachine.h" 
 // #include "motors/XYZ_Movements.h" // XYZ_Movements likely included via Homing.h if needed
 #include "motors/Homing.h" // Include the new Homing class header
+#include "storage/PaintingSettings.h" // Added for PaintingSettings
 
 // Add extern declaration for homeCommandReceived
 extern volatile bool homeCommandReceived;
@@ -53,6 +54,13 @@ extern FastAccelStepperEngine engine;
 // extern Bounce debounceY_Right;
 // extern Bounce debounceZ;
 
+extern PaintingSettings paintingSettings;
+
+// External references to immediate command system  
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
+
 HomingState::HomingState() : 
     _homingController(nullptr), // Initialize pointer
     _isHoming(false),
@@ -84,6 +92,27 @@ void HomingState::enter() {
 }
 
 void HomingState::update() {
+    // Check for immediate commands - be selective as homing is critical
+    if (immediateCommandPending) {
+        String command = pendingCommand;
+        command.toUpperCase();
+        
+        // Only allow very specific commands to interrupt homing for safety
+        if (command.startsWith("PAUSE") || command.startsWith("PAINT_GUN_OFF") || 
+            command.startsWith("PRESSURE_POT_OFF")) {
+            Serial.println("HomingState: Critical safety command detected - allowing interruption");
+            
+            // Let the main loop handle the immediate command
+            return;
+        } else {
+            Serial.println("HomingState: Non-critical command detected during homing - ignoring for safety");
+            // Clear the command as we're ignoring it during homing
+            immediateCommandPending = false;
+            pendingCommand = "";
+            pendingCommandClientNum = 0;
+        }
+    }
+    
     // If homing process hasn't completed yet
     if (_isHoming && !_homingComplete) {
         if (_homingController) {

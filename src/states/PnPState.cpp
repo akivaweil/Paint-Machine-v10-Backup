@@ -14,6 +14,11 @@
 #include "states/HomingState.h" // Include HomingState
 #include "states/PaintingState.h" // ADDED: Include PaintingState for transition
 #include "hardware/GlobalDebouncers.h" // For g_pnpCycleSensorDebouncer
+#include <WebSocketsServer.h>   // Include for WebSocket
+#include <FastAccelStepper.h>   // Include for stepper access
+#include "hardware/vacuum_Functions.h"    // Include for vacuum control
+#include "hardware/cylinder_Functions.h"  // Include for cylinder control
+#include "storage/PaintingSettings.h" // Include for PaintingSettings
 
 // Reference to the global state machine instance (already declared as extern in PnPState.h)
 // extern StateMachine* stateMachine; 
@@ -29,6 +34,17 @@ extern float g_pnp_x_speed;
 extern float g_pnp_x_accel;
 extern float g_pnp_y_speed;
 extern float g_pnp_y_accel;
+
+// External references
+extern ServoMotor myServo;
+extern StateMachine *stateMachine;
+extern PaintingSettings paintingSettings;
+extern volatile bool homeCommandReceived;
+
+// External references to immediate command system
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
 
 //* ************************************************************************
 //* ************************** PnP STATE **********************************
@@ -105,6 +121,32 @@ void PnPState::enter() {
 }
 
 void PnPState::update() {
+    // Check for immediate commands that should interrupt PnP operations
+    if (immediateCommandPending) {
+        Serial.println("PnPState: Immediate command detected - interrupting PnP process");
+        
+        // Stop any running motors immediately
+        if (stepperX && stepperX->isRunning()) {
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        }
+        if (stepperY_Left && stepperY_Left->isRunning()) {
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        }
+        if (stepperY_Right && stepperY_Right->isRunning()) {
+            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+        }
+        if (stepperZ && stepperZ->isRunning()) {
+            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        }
+        
+        // Turn off vacuum and raise cylinder for safety
+        vacuumOff();
+        cylinderUp();
+        
+        // Let the main loop handle the immediate command
+        return;
+    }
+    
     // Main update loop for PnP state
     
     g_pnpCycleSensorDebouncer.update(); // Update the global debouncer each cycle

@@ -32,6 +32,13 @@ void processWebSocketEventsFrequently();
 bool checkForHomeCommand();
 bool checkForPauseCommand();
 
+// Immediate command processing system
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
+void processImmediateCommand();
+bool isImmediateCommand(const String& command);
+
 // Function to initialize settings and pins related to web commands
 void setupWebDashboardCommands();
 
