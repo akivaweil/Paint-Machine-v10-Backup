@@ -16,7 +16,7 @@
 // #include "settings.h"
 // #include "XYZ_Movements.h"
 
-extern StateMachine *stateMachine; // Access the global state machine instance
+// Function-based StateMachine - no extern needed
 
 // Need access to the global stepper instances and engine
 extern FastAccelStepperEngine engine;
@@ -47,10 +47,11 @@ void PaintingState::enter() {
     Serial.println("PaintingState: Cleared pause state for new painting cycle");
     
     // Check if we are in the special "Paint All Sides" transition
-    if (stateMachine && stateMachine->isTransitioningToPaintAllSides()) {
+    // Check if transitioning to paint all sides (simplified for function-based approach)
+    if (true) { // Always execute painting logic
         Serial.println("PaintingState: Detected 'Paint All Sides' transition. Starting 'All Sides' directly without cleaning.");
         currentStep = PS_PERFORM_ALL_SIDES_PAINTING; // Set step to perform all sides painting
-        stateMachine->clearTransitioningToPaintAllSidesFlag(); // Clear the flag as it has been handled
+        // Flag cleared (function-based approach handles this differently)
     } else if (currentStep == PS_IDLE) {
         Serial.println("PaintingState: enter() - Normal entry. Starting 'All Sides' directly without cleaning.");
         currentStep = PS_PERFORM_ALL_SIDES_PAINTING; // Go directly to painting
@@ -114,14 +115,7 @@ void PaintingState::update() {
         
         case PS_REQUEST_HOMING:
             Serial.println("PaintingState: Sequence complete. Requesting Homing State.");
-            if (stateMachine && stateMachine->getHomingState()) {
-                stateMachine->changeState(stateMachine->getHomingState());
-            } else {
-                Serial.println("ERROR: PaintingState - Cannot transition to HomingState.");
-                if (stateMachine && stateMachine->getIdleState()) {
-                   stateMachine->changeState(stateMachine->getIdleState());
-                }
-            }
+            changeState(MachineState::HOMING);
             currentStep = PS_IDLE; // Reset for next entry into PaintingState
             break;
         

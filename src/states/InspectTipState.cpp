@@ -4,8 +4,7 @@
 #include "utils/settings.h"
 #include "system/StateMachine.h"
 #include <WebSocketsServer.h>
-
-extern StateMachine *stateMachine;
+#include <FastAccelStepper.h>
 extern FastAccelStepper* stepperX;
 extern FastAccelStepper* stepperY_Left;
 extern FastAccelStepper* stepperY_Right;
@@ -74,35 +73,19 @@ void InspectTipState::update() {
             
         case ITS_RETURNING_TO_IDLE:
             Serial.println("InspectTipState: Returning to idle state");
-            if (stateMachine && stateMachine->getIdleState()) {
-                stateMachine->changeState(stateMachine->getIdleState());
-            }
+            changeState(MachineState::IDLE);
             currentStep = ITS_IDLE;
             break;
             
         case ITS_TRANSITIONING_TO_PAINTING:
             Serial.println("InspectTipState: Transitioning to painting state");
-            if (stateMachine && stateMachine->getPaintingState()) {
-                stateMachine->changeState(stateMachine->getPaintingState());
-            } else {
-                Serial.println("ERROR: InspectTipState - Cannot transition to PaintingState, returning to idle");
-                if (stateMachine && stateMachine->getIdleState()) {
-                    stateMachine->changeState(stateMachine->getIdleState());
-                }
-            }
+            changeState(MachineState::PAINTING);
             currentStep = ITS_IDLE;
             break;
             
         case ITS_TRANSITIONING_TO_PNP:
             Serial.println("InspectTipState: Transitioning to PnP state");
-            if (stateMachine && stateMachine->getPnpState()) {
-                stateMachine->changeState(stateMachine->getPnpState());
-            } else {
-                Serial.println("ERROR: InspectTipState - Cannot transition to PnPState, returning to idle");
-                if (stateMachine && stateMachine->getIdleState()) {
-                    stateMachine->changeState(stateMachine->getIdleState());
-                }
-            }
+            changeState(MachineState::PNP);
             currentStep = ITS_IDLE;
             break;
             

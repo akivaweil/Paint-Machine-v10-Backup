@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "system/StateMachine.h"
 #include <WebSocketsServer.h>
+#include <FastAccelStepper.h>
 
 // External references for immediate command system
 extern bool immediateCommandPending;
