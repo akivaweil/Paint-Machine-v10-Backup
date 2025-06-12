@@ -7,7 +7,7 @@
 #include "system/StateMachine.h" 
 // #include "motors/XYZ_Movements.h" // XYZ_Movements likely included via Homing.h if needed
 #include "motors/Homing.h" // Include the new Homing class header
-#include "storage/PaintingSettings.h" // Added for PaintingSettings
+#include "storage/painting_settings.h" // Function-based painting settings
 
 // Add extern declaration for homeCommandReceived
 extern volatile bool homeCommandReceived;
@@ -54,7 +54,7 @@ extern FastAccelStepperEngine engine;
 // extern Bounce debounceY_Right;
 // extern Bounce debounceZ;
 
-extern PaintingSettings paintingSettings;
+// Removed extern PaintingSettings - using function-based approach
 
 // External references to immediate command system  
 extern bool immediateCommandPending;

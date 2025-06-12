@@ -8,59 +8,38 @@
 //* ************************* PERSISTENCE *********************************
 //* ************************************************************************
 
-class Persistence {
-private:
-    Preferences preferences;
-    const char* namespace_name = "paintmach"; // Namespace for Preferences library (max 15 chars)
-    const char* INIT_FLAG_KEY = "initialized"; // Key for initialization flag
+// Transaction Management
+void beginPersistenceTransaction(bool readOnly = false);
+void endPersistenceTransaction();
 
-public:
-    // Transaction Management
-    void beginTransaction(bool readOnly = false);
-    void endTransaction(); // Renamed from commitChanges
+// First-time initialization check
+bool isPersistenceInitialized();
+void savePersistenceFirstTimeFlag();
 
-    // First-time initialization check
-    bool isInitialized();
-    void saveFirstTimeFlag();
-    
-    // Check if a key exists
-    bool isKey(const char* key);
-    
-    // General methods
-    void saveInt(const char* key, int value);
-    int loadInt(const char* key, int defaultValue);
-    
-    void saveFloat(const char* key, float value);
-    float loadFloat(const char* key, float defaultValue);
-    
-    void saveString(const char* key, const String& value);
-    String loadString(const char* key, const String& defaultValue);
-    
-    void saveBool(const char* key, bool value);
-    bool loadBool(const char* key, bool defaultValue);
-    
-    // Clear all settings
-    void clearAll();
-    
-    // Commit changes to NVS - REMOVED (Renamed to endTransaction)
-    // void commitChanges();
+// Check if a key exists
+bool isPersistenceKey(const char* key);
 
-    // Close preferences (call when done) - REMOVED
-    // void end();
-};
+// General methods
+void savePersistenceInt(const char* key, int value);
+int loadPersistenceInt(const char* key, int defaultValue);
 
-// Global persistence instance
-extern Persistence persistence;
+void savePersistenceFloat(const char* key, float value);
+float loadPersistenceFloat(const char* key, float defaultValue);
+
+void savePersistenceString(const char* key, const String& value);
+String loadPersistenceString(const char* key, const String& defaultValue);
+
+void savePersistenceBool(const char* key, bool value);
+bool loadPersistenceBool(const char* key, bool defaultValue);
+
+// Clear all settings
+void clearAllPersistence();
 
 // Define keys for settings
-// const char* const SERVO_ANGLE_SIDE1_KEY = "srvAng1"; // REMOVED - Handled by PaintingSettings
-// const char* const SERVO_ANGLE_SIDE2_KEY = "srvAng2"; // REMOVED - Handled by PaintingSettings
-// const char* const SERVO_ANGLE_SIDE3_KEY = "srvAng3"; // REMOVED - Handled by PaintingSettings
-// const char* const SERVO_ANGLE_SIDE4_KEY = "srvAng4"; // REMOVED - Handled by PaintingSettings
-const char* const SERVO_ANGLE_SIDE1_KEY = "srvAng1"; // Re-added
-const char* const SERVO_ANGLE_SIDE2_KEY = "srvAng2"; // Re-added
-const char* const SERVO_ANGLE_SIDE3_KEY = "srvAng3"; // Re-added
-const char* const SERVO_ANGLE_SIDE4_KEY = "srvAng4"; // Re-added
+const char* const SERVO_ANGLE_SIDE1_KEY = "srvAng1";
+const char* const SERVO_ANGLE_SIDE2_KEY = "srvAng2";
+const char* const SERVO_ANGLE_SIDE3_KEY = "srvAng3";
+const char* const SERVO_ANGLE_SIDE4_KEY = "srvAng4";
 
 // Keys for other painting settings
 const char* const PAINT_SPEED_KEY = "pntSpd";

@@ -15,8 +15,8 @@
 #include <ArduinoOTA.h>
 #include "motors/XYZ_Movements.h"
 #include "motors/Rotation_Motor.h"
-#include "persistence/Persistence.h"
-#include "persistence/PaintingSettings.h"
+#include "storage/persistence.h"
+#include "storage/painting_settings.h"
 #include "states/HomingState.h"
 #include "system/StateMachine.h" // Function-based StateMachine
 #include <Preferences.h>
@@ -216,7 +216,7 @@ void initializeSettings() {
     // persistence.begin(); // REMOVED - begin/end handled transactionally now
     
     // Now initialize PaintingSettings, which might load or reset/save
-    paintingSettings.begin();
+    initializePaintingSettings();
 
     // Load PNP motion settings from NVS
     loadPnpSettingsFromNVS();

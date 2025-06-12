@@ -18,7 +18,7 @@
 #include <FastAccelStepper.h>   // Include for stepper access
 #include "hardware/vacuum_Functions.h"    // Include for vacuum control
 #include "hardware/cylinder_Functions.h"  // Include for cylinder control
-#include "storage/PaintingSettings.h" // Include for PaintingSettings
+#include "storage/painting_settings.h" // Function-based painting settings
 
 // Reference to the global state machine instance (already declared as extern in PnPState.h)
 // extern StateMachine* stateMachine; 
@@ -38,7 +38,7 @@ extern float g_pnp_y_accel;
 // External references
 extern ServoMotor myServo;
 extern StateMachine *stateMachine;
-extern PaintingSettings paintingSettings;
+// Removed extern PaintingSettings - using function-based approach
 extern volatile bool homeCommandReceived;
 
 // External references to immediate command system

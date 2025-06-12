@@ -5,7 +5,7 @@
 #include "../../include/hardware/paintGun_Functions.h"
 #include "../../include/hardware/pressurePot_Functions.h"
 #include "../../include/settings/painting.h"
-#include "../../include/persistence/PaintingSettings.h"
+#include "storage/painting_settings.h"
 #include <FastAccelStepper.h>
 #include "../../include/motors/ServoMotor.h"
 #include "../../include/web/Web_Dashboard_Commands.h"
@@ -18,7 +18,7 @@ extern FastAccelStepper *stepperY_Left;
 extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 extern ServoMotor myServo;
-extern PaintingSettings paintingSettings;
+// Removed extern PaintingSettings - using function-based approach
 // Function-based StateMachine - no extern needed
 extern WebSocketsServer webSocket;    // For immediate command processing
 
@@ -81,15 +81,15 @@ bool checkForImmediateCommandsSide2() {
 void paintSide2Pattern() {
     Serial.println("Starting Side 2 Pattern Painting (New Logic - Swapped from Side 4)");
 
-    int servoAngle = paintingSettings.getServoAngleSide2(); // Use Side 2 settings
-    long zPos = (long)(paintingSettings.getSide2ZHeight() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
-    long sideZPos = (long)(paintingSettings.getSide2SideZHeight() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
-    long startX_steps = (long)(paintingSettings.getSide2StartX() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
-    long startY_steps = (long)(paintingSettings.getSide2StartY() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
-    long sweepYDistance = (long)(paintingSettings.getSide2SweepY() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
-    long shiftXDistance = (long)(paintingSettings.getSide2ShiftX() * STEPS_PER_INCH_XYZ); // Use Side 2 settings - ensure this is positive
-    long paint_x_speed = paintingSettings.getSide2PaintingXSpeed(); // Use Side 2 settings
-    long paint_y_speed = paintingSettings.getSide2PaintingYSpeed(); // Use Side 2 settings
+    int servoAngle = getServoAngleSide2(); // Use Side 2 settings
+    long zPos = (long)(getSide2ZHeight() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
+    long sideZPos = (long)(getSide2SideZHeight() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
+    long startX_steps = (long)(getSide2StartX() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
+    long startY_steps = (long)(getSide2StartY() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
+    long sweepYDistance = (long)(getSide2SweepY() * STEPS_PER_INCH_XYZ); // Use Side 2 settings
+    long shiftXDistance = (long)(getSide2ShiftX() * STEPS_PER_INCH_XYZ); // Use Side 2 settings - ensure this is positive
+    long paint_x_speed = getSide2PaintingXSpeed(); // Use Side 2 settings
+    long paint_y_speed = getSide2PaintingYSpeed(); // Use Side 2 settings
     long first_sweep_paint_y_speed_side2 = (long)(paint_y_speed * 0.75f);
     long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 

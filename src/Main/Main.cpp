@@ -6,8 +6,8 @@
 #include <WebSocketsServer.h>
 #include "system/StateMachine.h"  // Now in include directory!
 #include "motors/ServoMotor.h"
-#include "storage/Persistence.h"
-#include "storage/PaintingSettings.h"
+#include "storage/persistence.h"
+#include "storage/painting_settings.h"
 
 // Include headers for functions called in loop
 #include "web/Web_Dashboard_Commands.h" // For runDashboardServer()
@@ -23,7 +23,7 @@ const unsigned long debounceDelay = 10;
 const int servoPin = 4;
 
 ServoMotor myServo(servoPin);
-extern PaintingSettings paintingSettings;
+// Removed extern PaintingSettings - using function-based approach
 
 // Define the global flag previously in machine_state.cpp
 volatile bool homeCommandReceived = false;
@@ -47,7 +47,7 @@ void setup() {
   setupWebDashboardCommands(); // Initialize pins and settings for web commands
   
   // Initialize servo after settings are loaded
-  int initialServoAngle = paintingSettings.getServoAngleSide1(); // Get initial angle from loaded settings
+  int initialServoAngle = getServoAngleSide1(); // Get initial angle from loaded settings
   myServo.init(initialServoAngle);
   Serial.printf("Servo Initialized at: %d degrees\n", initialServoAngle);
 

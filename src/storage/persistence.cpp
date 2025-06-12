@@ -1,32 +1,35 @@
-#include "storage/Persistence.h" // Updated include path
+#include "storage/persistence.h"
 
 //* ************************************************************************
 //* ************************* PERSISTENCE ***************************
 //* ************************************************************************
 
-Persistence persistence;
+// Static variables to replace class members
+static Preferences preferences;
+static const char* namespace_name = "paintmach"; // Namespace for Preferences library (max 15 chars)
+static const char* INIT_FLAG_KEY = "initialized"; // Key for initialization flag
 
-bool Persistence::isInitialized() {
+bool isPersistenceInitialized() {
     return preferences.getBool(INIT_FLAG_KEY, false);
 }
 
-void Persistence::saveFirstTimeFlag() {
+void savePersistenceFirstTimeFlag() {
     // Ensure preferences is open before writing
     // Always set the flag to true, regardless of whether it existed before.
     preferences.putBool(INIT_FLAG_KEY, true);
     Serial.println("Initialization flag set/confirmed");
 }
 
-bool Persistence::isKey(const char* key) {
+bool isPersistenceKey(const char* key) {
     return preferences.isKey(key);
 }
 
-void Persistence::saveInt(const char* key, int value) {
+void savePersistenceInt(const char* key, int value) {
     preferences.putInt(key, value);
     Serial.printf("Saved integer setting %s: %d\n", key, value);
 }
 
-int Persistence::loadInt(const char* key, int defaultValue) {
+int loadPersistenceInt(const char* key, int defaultValue) {
     if (!preferences.isKey(key)) {
         // First use, key doesn't exist yet, just use default
         return defaultValue;
@@ -36,12 +39,12 @@ int Persistence::loadInt(const char* key, int defaultValue) {
     return value;
 }
 
-void Persistence::saveFloat(const char* key, float value) {
+void savePersistenceFloat(const char* key, float value) {
     preferences.putFloat(key, value);
     Serial.printf("Saved float setting %s: %.2f\n", key, value);
 }
 
-float Persistence::loadFloat(const char* key, float defaultValue) {
+float loadPersistenceFloat(const char* key, float defaultValue) {
     if (!preferences.isKey(key)) {
         // First use, key doesn't exist yet, just use default silently
         return defaultValue;
@@ -51,12 +54,12 @@ float Persistence::loadFloat(const char* key, float defaultValue) {
     return value;
 }
 
-void Persistence::saveString(const char* key, const String& value) {
+void savePersistenceString(const char* key, const String& value) {
     preferences.putString(key, value);
     Serial.printf("Saved string setting %s: %s\n", key, value.c_str());
 }
 
-String Persistence::loadString(const char* key, const String& defaultValue) {
+String loadPersistenceString(const char* key, const String& defaultValue) {
     if (!preferences.isKey(key)) {
         // First use, key doesn't exist yet, just use default
         return defaultValue;
@@ -66,12 +69,12 @@ String Persistence::loadString(const char* key, const String& defaultValue) {
     return value;
 }
 
-void Persistence::saveBool(const char* key, bool value) {
+void savePersistenceBool(const char* key, bool value) {
     preferences.putBool(key, value);
     Serial.printf("Saved bool setting %s: %s\n", key, value ? "true" : "false");
 }
 
-bool Persistence::loadBool(const char* key, bool defaultValue) {
+bool loadPersistenceBool(const char* key, bool defaultValue) {
     if (!preferences.isKey(key)) {
         // First use, key doesn't exist yet, just use default
         return defaultValue;
@@ -81,12 +84,12 @@ bool Persistence::loadBool(const char* key, bool defaultValue) {
     return value;
 }
 
-void Persistence::clearAll() {
+void clearAllPersistence() {
     preferences.clear();
     Serial.println("All settings cleared");
 }
 
-void Persistence::beginTransaction(bool readOnly /*= false*/) {
+void beginPersistenceTransaction(bool readOnly /*= false*/) {
     // Namespace is already member, readOnly controls mode
     preferences.begin(namespace_name, readOnly); 
     if (!readOnly) {
@@ -96,7 +99,7 @@ void Persistence::beginTransaction(bool readOnly /*= false*/) {
     }
 }
 
-void Persistence::endTransaction() { // Renamed from commitChanges
+void endPersistenceTransaction() { // Renamed from commitChanges
     preferences.end(); // Close and commit (if opened R/W)
     Serial.println("NVS transaction ended/committed.");
 } 

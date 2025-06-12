@@ -4,7 +4,7 @@
 #include "system/StateMachine.h"  // Include header for StateMachine access
 // #include "motors/Homing.h"        // REMOVE: Homing will be handled by HomingState
 #include <FastAccelStepper.h>      // Include for stepper access
-#include "persistence/PaintingSettings.h"
+#include "storage/painting_settings.h"
 #include "motors/Rotation_Motor.h"
 // #include "system/machine_state.h" // No longer needed
 #include "hardware/paintGun_Functions.h" // Added include for paintGun_OFF

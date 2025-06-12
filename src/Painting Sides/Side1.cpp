@@ -5,7 +5,7 @@
 #include "../../include/hardware/paintGun_Functions.h" // For paintGun_ON/OFF
 #include "../../include/hardware/pressurePot_Functions.h" // For PressurePot_ON
 #include <FastAccelStepper.h>
-#include "../../include/persistence/PaintingSettings.h" // Include for accessing saved settings
+#include "storage/painting_settings.h" // Function-based painting settings
 #include "../../include/settings/painting.h"         // For painting-specific constants (SIDE1_Z_HEIGHT etc.)
 #include "../../include/motors/ServoMotor.h"         // For ServoMotor class
 #include "states/PaintingState.h" // Correct filename
@@ -20,7 +20,7 @@ extern FastAccelStepper *stepperY_Left;
 extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 extern ServoMotor myServo; // Declare external servo instance
-extern PaintingSettings paintingSettings; // Make sure global instance is accessible
+// Removed extern PaintingSettings - using function-based approach
 extern WebSocketsServer webSocket;    // For immediate command processing
 
 // External references to immediate command system
@@ -75,7 +75,7 @@ bool paintSide1Pattern() {
     Serial.println("Starting Side 1 Pattern Painting - With Immediate Command Support");
 
     //! Set Servo Angle
-    int servoAngle = paintingSettings.getServoAngleSide1();
+    int servoAngle = getServoAngleSide1();
     myServo.setAngle(servoAngle);
     Serial.println("Servo set to: " + String(servoAngle) + " degrees for Side 1");
 
@@ -83,8 +83,8 @@ bool paintSide1Pattern() {
     PressurePot_ON();
 
     //! Move to side 1 safe Z height
-    long zPos = (long)(paintingSettings.getSide1ZHeight() * STEPS_PER_INCH_XYZ);
-    long sideZPos = (long)(paintingSettings.getSide1SideZHeight() * STEPS_PER_INCH_XYZ);
+    long zPos = (long)(getSide1ZHeight() * STEPS_PER_INCH_XYZ);
+    long sideZPos = (long)(getSide1SideZHeight() * STEPS_PER_INCH_XYZ);
     moveToXYZ(stepperX->getCurrentPosition(), DEFAULT_X_SPEED,
               stepperY_Left->getCurrentPosition(), DEFAULT_Y_SPEED,
               sideZPos, DEFAULT_Z_SPEED);
@@ -94,8 +94,8 @@ bool paintSide1Pattern() {
     Serial.println("Rotated to side 1 position");
 
     //! Move to start position
-    long startX = (long)(paintingSettings.getSide1StartX() * STEPS_PER_INCH_XYZ);
-    long startY = (long)(paintingSettings.getSide1StartY() * STEPS_PER_INCH_XYZ);
+    long startX = (long)(getSide1StartX() * STEPS_PER_INCH_XYZ);
+    long startY = (long)(getSide1StartY() * STEPS_PER_INCH_XYZ);
     moveToXYZ(startX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
     Serial.println("Moved to side 1 pattern start position");
 
@@ -103,8 +103,8 @@ bool paintSide1Pattern() {
     moveToXYZ(startX, DEFAULT_X_SPEED, startY, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
 
     //! Execute painting pattern - continuous motion with paint gun control
-    long shiftXDistance = (long)(paintingSettings.getSide1ShiftX() * STEPS_PER_INCH_XYZ);
-    long xSpeed = paintingSettings.getSide1PaintingXSpeed();
+    long shiftXDistance = (long)(getSide1ShiftX() * STEPS_PER_INCH_XYZ);
+    long xSpeed = getSide1PaintingXSpeed();
     long finalX = startX + shiftXDistance;
     long paintStartX = startX + (long)(0.25f * STEPS_PER_INCH_XYZ);
     long paintStopX = finalX - (long)(1.0f * STEPS_PER_INCH_XYZ);
