@@ -11,7 +11,8 @@
 #include "states/PaintingState.h" // Correct filename
 #include "settings/pins.h"        // Keep this one
 #include "../../include/web/Web_Dashboard_Commands.h" // For checkForHomeCommand
-#include "../../include/system/StateMachine.h" // Include StateMachine header
+#include "system/StateMachine.h"  // Updated include
+
 
 // External references to stepper motors
 extern FastAccelStepper *stepperX;
@@ -20,7 +21,6 @@ extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 extern ServoMotor myServo; // Declare external servo instance
 extern PaintingSettings paintingSettings; // Make sure global instance is accessible
-// Using function-based state machine
 
 //* ************************************************************************
 //* *************************** SIDE 1 *************************************
@@ -109,7 +109,7 @@ bool paintSide1Pattern() {
 
     //! Stage 5: Transition back to Homing State after completion
     Serial.println("Side 1 painting complete. Transitioning to Homing State...");
-    stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call
+    changeState(MachineState::HOMING);  // Use function-based approach
 
     return true;
 }

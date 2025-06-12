@@ -99,44 +99,4 @@ void Persistence::beginTransaction(bool readOnly /*= false*/) {
 void Persistence::endTransaction() { // Renamed from commitChanges
     preferences.end(); // Close and commit (if opened R/W)
     Serial.println("NVS transaction ended/committed.");
-}
-
-//* ************************************************************************
-//* ***************** FUNCTION-BASED PERSISTENCE WRAPPERS *****************
-//* ************************************************************************
-
-void beginPersistenceTransaction(bool readOnly) {
-    persistence.beginTransaction(readOnly);
-}
-
-void endPersistenceTransaction() {
-    persistence.endTransaction();
-}
-
-bool isPersistenceInitialized() {
-    return persistence.isInitialized();
-}
-
-void savePersistenceFirstTimeFlag() {
-    persistence.saveFirstTimeFlag();
-}
-
-bool isPersistenceKey(const char* key) {
-    return persistence.isKey(key);
-}
-
-float loadPersistenceFloat(const char* key, float defaultValue) {
-    return persistence.loadFloat(key, defaultValue);
-}
-
-int loadPersistenceInt(const char* key, int defaultValue) {
-    return persistence.loadInt(key, defaultValue);
-}
-
-void savePersistenceFloat(const char* key, float value) {
-    persistence.saveFloat(key, value);
-}
-
-void savePersistenceInt(const char* key, int value) {
-    persistence.saveInt(key, value);
 } 

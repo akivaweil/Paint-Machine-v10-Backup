@@ -65,6 +65,14 @@ bool isInspectTipState();
 void emergencyStop();
 void forceToIdleState();
 
+// Transition management functions
+bool isTransitioningToPaintAllSides();
+void setTransitioningToPaintAllSides(bool flag);
+void clearTransitioningToPaintAllSidesFlag();
+
+// Status functions
+String createStatusJson();
+
 // Individual state functions
 void enterIdleState();
 void updateIdleState();

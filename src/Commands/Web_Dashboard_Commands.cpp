@@ -30,6 +30,7 @@
 #include <limits.h> // ADDED For LONG_MIN, INT_MIN
 #include "system/GlobalState.h" // ADDED for isPaused and isActivePainting
 
+
 // --- PNP Settings Keys for NVS ---
 #define PNP_X_SPEED_KEY "pnpXSpd"
 #define PNP_X_ACCEL_KEY "pnpXAcc"
@@ -90,10 +91,13 @@ extern WebSocketsServer webSocket;
 extern bool webSocketServerStarted; // Use global flag from Setup.cpp
 
 // Reference to the global state machine instance (assuming it's defined in Setup.cpp or main.cpp)
-extern StateMachine* stateMachine;
+// extern StateMachine* stateMachine;
 
 // Reference to the global servo motor instance
 extern ServoMotor myServo;
+
+// Add missing variable declaration
+extern volatile bool homeCommandReceived;
 
 // Declarations for functions now that Commands.h is removed
 void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandPayload);
@@ -181,9 +185,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         Serial.printf("[WS] Client #%u connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
         
         // --- Send current state to newly connected client --- 
-        if (stateMachine && stateMachine->getCurrentState()) {
+        if (getCurrentStateName()) {
             String stateMessage = "STATE:";
-            stateMessage += stateMachine->getCurrentState()->getName();
+            stateMessage += getCurrentStateName();
             webSocket.sendTXT(num, stateMessage);
             Serial.print("Sent current state to client #");
             Serial.print(num);
@@ -234,8 +238,7 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     baseCommand.toUpperCase();
     
     // If it's an immediate command and we're not already in idle state, flag for immediate processing
-    if (isImmediateCommand(baseCommand) && stateMachine && 
-        stateMachine->getCurrentState() != stateMachine->getIdleState()) {
+    if (isImmediateCommand(baseCommand) && getCurrentStateName()) {
         Serial.print("IMMEDIATE COMMAND DETECTED: ");
         Serial.println(baseCommand);
         
@@ -288,9 +291,9 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
                 webSocket->sendTXT(num, "CMD_ACK: System Resumed");
                 webSocket->broadcastTXT("STATUS:RESUMED");
                 // Potentially broadcast current machine state after resuming
-                if (stateMachine && stateMachine->getCurrentState()) {
+                if (getCurrentStateName()) {
                     String stateMessage = "STATE:";
-                    stateMessage += stateMachine->getCurrentState()->getName();
+                    stateMessage += getCurrentStateName();
                     webSocket->broadcastTXT(stateMessage);
                 }
                 Serial.print("[DEBUG] RESUME command completed at: ");
@@ -387,7 +390,7 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
 
     // --- STATE MACHINE CHECK --- 
     // Note: Using baseCommandAction here
-    if (stateMachine && stateMachine->getCurrentState() != stateMachine->getIdleState() && 
+    if (getCurrentStateName() && 
         (baseCommandAction == "HOME_ALL" || 
          baseCommandAction == "START_PNP" ||
          baseCommandAction == "PAINT_SIDE_1" || 
@@ -410,10 +413,14 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         // sendWebStatus(webSocket, "STATUS_UPDATE"); // Call with a message or update internal logic
                                                    // Assuming sendWebStatus broadcasts or uses webSocket internally
                                                    // If it MUST send to 'num', sendWebStatus needs modification.
+        if (getCurrentStateName()) {
+            String statusJson = createStatusJson();
+            webSocket->sendTXT(num, statusJson);
+        }
     }
     else if (baseCommandAction == "HOME_ALL") {
         // Trigger homing state
-        if (stateMachine) {
+        if (getCurrentStateName()) {
             // Force stop any running motors first
             if (stepperX->isRunning()) stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
             if (stepperY_Left->isRunning()) stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
@@ -424,7 +431,7 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
             homeCommandReceived = true;
             
             // Change to homing state immediately
-            stateMachine->changeState(stateMachine->getHomingState());
+            changeState(MachineState::HOMING);
             webSocket->sendTXT(num, "CMD_ACK: Homing sequence initiated.");
         } else {
              webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
@@ -433,8 +440,8 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     else if (baseCommandAction == "START_PNP") { // Changed command name
         // Trigger PnP state via StateMachine - NEW WAY
         Serial.println("Transitioning to PnP State via web command...");
-        if (stateMachine) {
-            stateMachine->changeState(stateMachine->getPnpState());
+        if (getCurrentStateName()) {
+            changeState(MachineState::PNP);
             webSocket->sendTXT(num, "CMD_ACK: PnP State initiated.");
         } else {
             webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
@@ -466,8 +473,8 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     }
     else if (baseCommandAction == "INSPECT_TIP_ON") {
         Serial.println("Activating Inspect Tip mode via web command");
-        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getIdleState()) {
-            stateMachine->changeState(stateMachine->getInspectTipState());
+        if (getCurrentStateName() && isIdleState()) {
+            changeState(MachineState::INSPECT_TIP);
             webSocket->sendTXT(num, "CMD_ACK: Inspect Tip mode activated");
         } else {
             Serial.println("Inspect Tip command rejected: Machine not in IDLE state");
@@ -476,10 +483,9 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     }
     else if (baseCommandAction == "INSPECT_TIP_OFF") {
         Serial.println("Deactivating Inspect Tip mode via web command");
-        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getInspectTipState()) {
+        if (getCurrentStateName() && isInspectTipState()) {
             // Cast to InspectTipState to call returnToIdle method
-            InspectTipState* inspectState = static_cast<InspectTipState*>(stateMachine->getInspectTipState());
-            inspectState->returnToIdle();
+            changeState(MachineState::IDLE);
             webSocket->sendTXT(num, "CMD_ACK: Inspect Tip mode deactivated");
         } else {
             Serial.println("Inspect Tip OFF command ignored: Not in Inspect Tip state");
@@ -488,10 +494,9 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     }
     else if (baseCommandAction == "INSPECT_TIP_TO_PAINTING") {
         Serial.println("Transitioning from Inspect Tip to Painting via web command");
-        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getInspectTipState()) {
+        if (getCurrentStateName() && isInspectTipState()) {
             // Cast to InspectTipState to call transitionToPainting method
-            InspectTipState* inspectState = static_cast<InspectTipState*>(stateMachine->getInspectTipState());
-            inspectState->transitionToPainting();
+            changeState(MachineState::PAINTING);
             webSocket->sendTXT(num, "CMD_ACK: Transitioning from Inspect Tip to Painting");
         } else {
             Serial.println("Inspect Tip to Painting command ignored: Not in Inspect Tip state");
@@ -500,10 +505,9 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     }
     else if (baseCommandAction == "INSPECT_TIP_TO_PNP") {
         Serial.println("Transitioning from Inspect Tip to PnP via web command");
-        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getInspectTipState()) {
+        if (getCurrentStateName() && isInspectTipState()) {
             // Cast to InspectTipState to call transitionToPnP method
-            InspectTipState* inspectState = static_cast<InspectTipState*>(stateMachine->getInspectTipState());
-            inspectState->transitionToPnP();
+            changeState(MachineState::PNP);
             webSocket->sendTXT(num, "CMD_ACK: Transitioning from Inspect Tip to PnP");
         } else {
             Serial.println("Inspect Tip to PnP command ignored: Not in Inspect Tip state");
@@ -558,9 +562,9 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     else if (baseCommandAction == "PAINT_ALL_SIDES") {
         Serial.println("Painting all sides (single coat request)...");
         g_requestedCoats = 1; // Explicitly set 1 coat for this command
-        if (stateMachine) {
-            stateMachine->setTransitioningToPaintAllSides(true); // Set the flag
-            stateMachine->changeState(stateMachine->getPaintingState()); // Go directly to painting
+        if (getCurrentStateName()) {
+            setTransitioningToPaintAllSides(true); // Set the flag
+            changeState(MachineState::PAINTING); // Go directly to painting
             webSocket->sendTXT(num, "CMD_ACK: Single All Sides paint sequence initiated."); // Inform user
         } else {
             Serial.println("ERROR: StateMachine pointer null. Cannot start Paint All Sides.");
@@ -606,11 +610,11 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         g_requestedCoats = numCoats;
         g_interCoatDelaySeconds = interCoatDelaySec; 
 
-        if (stateMachine) {
+        if (getCurrentStateName()) {
             // Check if machine is IDLE before starting multi-coat
-            if (stateMachine->getCurrentState() == stateMachine->getIdleState()) {
-                stateMachine->setTransitioningToPaintAllSides(true); // Set the flag
-                stateMachine->changeState(stateMachine->getPaintingState()); // Go directly to painting
+            if (isIdleState()) {
+                setTransitioningToPaintAllSides(true); // Set the flag
+                changeState(MachineState::PAINTING); // Go directly to painting
                 webSocket->sendTXT(num, "CMD_ACK: Multiple All Sides paint sequence initiated (" + String(numCoats) + " coats, " + String(interCoatDelaySec) + "s delay).");
             } else {
                  Serial.print("Command ");
@@ -629,8 +633,8 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         // Set machine state directly
         // extern void setMachineState(int state); // No need to set directly, state machine handles it
         // setMachineState(MACHINE_CLEANING);
-        if (stateMachine) {
-            stateMachine->changeState(stateMachine->getCleaningState());
+        if (getCurrentStateName()) {
+            changeState(MachineState::CLEANING);
             webSocket->sendTXT(num, "CMD_ACK: Entering Cleaning Mode");
         } else {
             webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
@@ -640,8 +644,8 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         // Enter pick and place mode via web command
         // NEW WAY: Transition using StateMachine
         Serial.println("Websocket: ENTER_PICKPLACE command received. Transitioning to PnPState...");
-        if (stateMachine) {
-            stateMachine->changeState(stateMachine->getPnpState());
+        if (getCurrentStateName()) {
+            changeState(MachineState::PNP);
             webSocket->sendTXT(num, "CMD_ACK: PnP State initiated.");
         } else {
             webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
@@ -657,8 +661,8 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         homeCommandReceived = true;
         
         // Change to homing state immediately
-        if (stateMachine) {
-            stateMachine->changeState(stateMachine->getHomingState());
+        if (getCurrentStateName()) {
+            changeState(MachineState::HOMING);
             webSocket->sendTXT(num, "CMD_ACK: Homing sequence initiated.");
         } else {
             webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
@@ -682,9 +686,9 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         webSocket->sendTXT(num, "CMD_ACK: System Resumed");
         webSocket->broadcastTXT("STATUS:RESUMED");
         // Potentially broadcast current machine state after resuming
-        if (stateMachine && stateMachine->getCurrentState()) {
+        if (getCurrentStateName()) {
             String stateMessage = "STATE:";
-            stateMessage += stateMachine->getCurrentState()->getName();
+            stateMessage += getCurrentStateName();
             webSocket->broadcastTXT(stateMessage);
         }
         Serial.print("[DEBUG] RESUME (plain) command completed at: ");
@@ -695,7 +699,7 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         float z_pos_inch = value1;
         long z_pos_steps = (long)(z_pos_inch * STEPS_PER_INCH_XYZ);
         // Compare with StateMachine state
-        if (stateMachine && (stateMachine->getCurrentState() == stateMachine->getIdleState() || stateMachine->getCurrentState() == stateMachine->getPnpState())) { 
+        if (getCurrentStateName() && (isIdleState() || isPnPState())) { 
             Serial.printf("Preview move Z to: %.2f inches (%ld steps)\n", z_pos_inch, z_pos_steps);
             // Get current X and Y to maintain position
             long currentX = stepperX->getCurrentPosition();
@@ -709,7 +713,7 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     else if (baseCommandAction == "MOVE_SERVO_PREVIEW") {
         int angle = (int)value1;
         // Compare with StateMachine state
-        if (stateMachine && (stateMachine->getCurrentState() == stateMachine->getIdleState() || stateMachine->getCurrentState() == stateMachine->getPnpState())) { 
+        if (getCurrentStateName() && (isIdleState() || isPnPState())) { 
              if (angle >= 0 && angle <= 180) {
                  Serial.printf("Preview move Servo to: %d\n", angle);
                  myServo.setAngle(angle);
@@ -1351,6 +1355,52 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         digitalWrite(PRESSURE_POT_PIN, !digitalRead(PRESSURE_POT_PIN));
         webSocket->sendTXT(num, "CMD_ACK: Pressure Pot toggled");
     }
+    else if (baseCommandAction == "tip_inspect_enter") {
+        if (getCurrentStateName() && isIdleState()) {
+            changeState(MachineState::INSPECT_TIP);
+            webSocket->sendTXT(num, "CMD_ACK: Inspect Tip mode activated");
+        } else {
+            Serial.println("Inspect Tip command rejected: Machine not in IDLE state");
+            webSocket->sendTXT(num, "CMD_ERROR: Machine must be in IDLE state");
+        }
+    }
+    else if (baseCommandAction == "tip_inspect_exit") {
+        if (getCurrentStateName() && isInspectTipState()) {
+            changeState(MachineState::IDLE);
+            webSocket->sendTXT(num, "CMD_ACK: Inspect Tip mode deactivated");
+        } else {
+            Serial.println("Inspect Tip OFF command ignored: Not in Inspect Tip state");
+            webSocket->sendTXT(num, "CMD_ACK: Inspect Tip already off");
+        }
+    }
+    else if (baseCommandAction == "tip_inspect_move_down") {
+        if (getCurrentStateName() && isInspectTipState()) {
+            // Handle tip movement
+        }
+    }
+    else if (baseCommandAction == "tip_inspect_move_up") {
+        if (getCurrentStateName() && isInspectTipState()) {
+            // Handle tip movement
+        }
+    }
+    else if (baseCommandAction == "pnp_enter") {
+        if (getCurrentStateName() && (isIdleState() || isPnPState())) {
+            changeState(MachineState::PNP);
+            webSocket->sendTXT(num, "CMD_ACK: PnP State initiated.");
+        } else {
+            Serial.println("PnP command rejected: Machine not in IDLE or PnP state");
+            webSocket->sendTXT(num, "CMD_ERROR: Machine not in IDLE or PnP state");
+        }
+    }
+    else if (baseCommandAction == "pnp_exit") {
+        if (getCurrentStateName() && (isIdleState() || isPnPState())) {
+            changeState(MachineState::IDLE);
+            webSocket->sendTXT(num, "CMD_ACK: PnP State exited.");
+        } else {
+            Serial.println("PnP exit command ignored: Machine not in IDLE or PnP state");
+            webSocket->sendTXT(num, "CMD_ERROR: Machine not in IDLE or PnP state");
+        }
+    }
     else {
         // Unknown command
         Serial.print("Unknown command received: ");
@@ -1408,9 +1458,9 @@ bool checkForHomeCommand() {
     if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
     
     // If we have a state machine, immediately change to homing state
-    if (stateMachine) {
+    if (getCurrentStateName()) {
       Serial.println("Changing to homing state immediately due to HOME command");
-      stateMachine->changeState(stateMachine->getHomingState());
+      changeState(MachineState::HOMING);
     }
     
     return true;

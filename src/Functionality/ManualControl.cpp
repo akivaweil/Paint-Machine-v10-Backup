@@ -1,4 +1,4 @@
-#include "functionality/ManualControl.h"
+#include "Functionality/ManualControl.h"
 #include <Arduino.h>
 #include "motors/XYZ_Movements.h"
 #include "motors/ServoMotor.h"
@@ -8,6 +8,7 @@
 #include "motors/Rotation_Motor.h" // ADDED for tray rotation
 #include "settings/motion.h" // ADDED for STEPS_PER_DEGREE
 #include <limits.h> // For LONG_MIN, INT_MIN
+
 
 // External instances from the main project
 extern ServoMotor myServo;
@@ -34,18 +35,26 @@ const int ANGLE_NOT_PROVIDED = INT_MIN;
 // such as moving to specific coordinates or rotating the tray, callable when
 // the machine is in an appropriate state (e.g., Idle).
 
+//* ************************************************************************
+//* ******************** MANUAL MOVEMENT SAFETY *********************
+//* ************************************************************************
+
+/**
+ * Check if manual movements are allowed based on current machine state
+ */
 bool canPerformManualMove() {
-    if (!stateMachine || !stateMachine->getCurrentState()) {
-        Serial.println("Error: StateMachine or current state is null in canPerformManualMove.");
+    // Use function-based state machine
+    if (!isIdleState() && !isPnPState()) {
+        Serial.println("ERROR: Manual movements only allowed in IDLE or PNP state");
         return false;
     }
-    const char* current_state_name = stateMachine->getCurrentState()->getName();
-    if (strcmp(current_state_name, "IDLE") == 0) {
-        return true;
+
+    const char* current_state_name = getCurrentStateName();
+    if (current_state_name) {
+        Serial.printf("Manual move allowed in state: %s\n", current_state_name);
     }
-    // Serial.print("Manual move not allowed in state: "); // Optional: for debugging
-    // Serial.println(current_state_name);
-    return false;
+    
+    return true;
 }
 
 void handleManualMoveToPosition(long targetX_steps, long targetY_steps, long targetZ_steps_param, int targetAngle_deg_param) {

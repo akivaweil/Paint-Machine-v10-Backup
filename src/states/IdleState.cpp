@@ -9,7 +9,7 @@
 // GlobalDebouncers.h is already included via IdleState.h
 
 // Reference to the global state machine instance
-extern StateMachine* stateMachine;
+// extern StateMachine* stateMachine; // Removed - using function-based approach
 extern ServoMotor myServo; // Declare myServo as extern
 
 //* ************************************************************************
@@ -91,11 +91,7 @@ void IdleState::update() {
     // Check if the PnP cycle sensor is pressed (active LOW, detected by falling edge)
     if (g_pnpCycleSensorDebouncer.fell()) { // MODIFIED: Check for falling edge on global debouncer
         Serial.println("PnP Cycle Sensor activated (falling edge) in IdleState. Transitioning to PnPState...");
-        if (stateMachine) { // Check if stateMachine exists
-            stateMachine->changeState(stateMachine->getPnpState()); // Use getter
-        } else {
-            Serial.println("ERROR: StateMachine pointer is null in IdleState!");
-        }
+                  changeState(MachineState::PNP); // Use function-based approach
         return; // Exit update early after transition
     }
 }

@@ -8,6 +8,11 @@
 // #include "motors/XYZ_Movements.h" // XYZ_Movements likely included via Homing.h if needed
 #include "motors/Homing.h" // Include the new Homing class header
 #include "storage/PaintingSettings.h" // Added for PaintingSettings
+// #include "hardware/Motors.h" // File doesn't exist
+// #include "hardware/Output.h" // File doesn't exist
+// #include "hardware/Input.h" // File doesn't exist
+// #include "settings/Settings.h" // File doesn't exist
+// #include "storage/Persistence.h" // File doesn't exist
 
 // Add extern declaration for homeCommandReceived
 extern volatile bool homeCommandReceived;
@@ -33,7 +38,7 @@ extern FastAccelStepper *rotationStepper; // Declared in Rotation_Motor.h
 // bool isHoming = false; // Moved to Homing class or managed internally
 
 // Reference to the state machine
-extern StateMachine* stateMachine;
+// extern StateMachine* stateMachine;
 
 // // Utility function to convert inches to steps - Moved to Homing class or shared location
 // long inchesToStepsXYZ(float inches) {
@@ -138,14 +143,10 @@ void HomingState::update() {
             // Future: Transition to ErrorState?
         }
         
-        if (stateMachine) {
-            stateMachine->changeState(stateMachine->getIdleState()); 
-            // Reset flag for next entry after transition
-            _homingComplete = false; 
-        } else {
-            Serial.println("ERROR: StateMachine pointer null in HomingState::update()! Cannot transition.");
-             // Prevent potential infinite loop if stateMachine is null
-             _homingComplete = false; 
+        if (_homingComplete) {
+            if (getCurrentStateName()) {
+                changeState(MachineState::IDLE);  // Use function-based approach
+            }
         }
     }
 }

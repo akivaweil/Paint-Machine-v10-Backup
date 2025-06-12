@@ -37,7 +37,7 @@ extern float g_pnp_y_accel;
 
 // External references
 extern ServoMotor myServo;
-extern StateMachine *stateMachine;
+// extern StateMachine *stateMachine; // Removed - using function-based approach
 extern PaintingSettings paintingSettings;
 extern volatile bool homeCommandReceived;
 
@@ -264,16 +264,8 @@ void PnPState::update() {
             // This state now mainly exists to ensure the final move back completes
             // before the transition out check happens.
             // MODIFIED: Transition to Homing State instead of relying on other logic or Idle directly
-            if (stateMachine) {
-                Serial.println("PnP Cycle complete. Transitioning to Homing State.");
-                stateMachine->changeState(stateMachine->getHomingState()); // Assuming getHomingState() exists
-            } else {
-                Serial.println("ERROR: StateMachine pointer is null in PnPState! Cannot transition to Homing.");
-                // Fallback or error handling: maybe try to go to Idle or just log heavily
-                // For now, let's assume stateMachine is valid and try to go to Idle as a last resort if homing fails.
-                // This part might need more robust error handling depending on system design.
-                if (stateMachine) stateMachine->changeState(stateMachine->getIdleState());
-            }
+            Serial.println("PnP Cycle complete. Transitioning to Homing State.");
+            changeState(MachineState::HOMING);
             break;
 
         default:
@@ -314,11 +306,7 @@ void PnPState::resetStateAndReturnToIdle() {
     pnpCycleIsComplete = false;
     
     // Transition to idle
-    if (stateMachine) {
-        stateMachine->changeState(stateMachine->getIdleState());
-    } else {
-        Serial.println("ERROR: StateMachine pointer is null in PnPState! Cannot return to idle.");
-    }
+    changeState(MachineState::IDLE);
 }
 
 // --- Private Helper Methods ---

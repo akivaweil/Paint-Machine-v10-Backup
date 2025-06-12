@@ -13,6 +13,7 @@
 #include "system/GlobalState.h"    // For isPaused
 #include <WebSocketsServer.h>     // For webSocket.loop()
 
+
 extern ServoMotor myServo;
 extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
@@ -304,10 +305,8 @@ void paintAllSides() {
     //! ************************************************************************
     Serial.println("Initiating homing sequence using proper homing state...");
     
-    if (stateMachine) {
-        // Change to homing state - this will properly home all axes including rotation
-        stateMachine->changeState(stateMachine->getHomingState());
-        Serial.println("Changed to homing state for proper axis positioning.");
+    if (getCurrentStateName()) {
+        changeState(MachineState::HOMING);  // Use function-based approach
     } else {
         Serial.println("ERROR: StateMachine not available for homing. Performing basic cleanup.");
         

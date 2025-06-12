@@ -11,6 +11,7 @@
 #include "../../include/web/Web_Dashboard_Commands.h"
 #include "../../include/system/StateMachine.h"
 
+
 // External references to stepper motors
 extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
@@ -313,5 +314,5 @@ void paintSide2Pattern() {
 
     //! Transition to Homing State
     Serial.println("Side 2 painting complete. Transitioning to Homing State...");
-    stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call
+    changeState(MachineState::HOMING);  // Use function-based approach
 }

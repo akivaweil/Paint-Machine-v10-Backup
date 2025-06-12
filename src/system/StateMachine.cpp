@@ -293,9 +293,9 @@ void enterIdleState() {
     isPaused = false;
     Serial.println("IdleState: Cleared pause state on entry");
     
-    // Set servo to 180 degrees
-    setServoAngle(180);
-    Serial.println("Servo set to 180 degrees in Idle State.");
+    // TODO: Set servo to 180 degrees - setServoAngle function needs to be implemented
+    // setServoAngle(180);
+    Serial.println("Servo would be set to 180 degrees in Idle State (function not implemented).");
     
     Serial.println("Idle state active. Press PnP cycle sensor to enter PnP mode.");
 }
@@ -326,14 +326,10 @@ void exitIdleState() {
 void enterHomingState() {
     Serial.println("Entering HOMING state");
     
-    // Start homing process (homing system already initialized in Setup.cpp)
-    if (homeAllAxes()) {
-        Serial.println("Homing completed successfully - transitioning to IDLE");
-        changeState(MachineState::IDLE);
-    } else {
-        Serial.println("Homing failed - staying in HOMING state");
-        // Could transition to error state or retry
-    }
+    // TODO: Implement homing logic
+    // For now, just transition to IDLE
+    Serial.println("Homing state entered - transitioning to IDLE");
+    changeState(MachineState::IDLE);
 }
 
 void updateHomingState() {
@@ -446,4 +442,35 @@ void updateInspectTipState() {
 
 void exitInspectTipState() {
     Serial.println("Exiting INSPECT_TIP state");
+}
+
+//* ************************************************************************
+//* ******************** TRANSITION MANAGEMENT ***************************
+//* ************************************************************************
+
+// Global transition flag
+static bool transitioningToPaintAllSides = false;
+
+bool isTransitioningToPaintAllSides() {
+    return transitioningToPaintAllSides;
+}
+
+void setTransitioningToPaintAllSides(bool flag) {
+    transitioningToPaintAllSides = flag;
+    Serial.print("Transition to Paint All Sides flag set to: ");
+    Serial.println(flag ? "true" : "false");
+}
+
+void clearTransitioningToPaintAllSidesFlag() {
+    transitioningToPaintAllSides = false;
+    Serial.println("Paint All Sides transition flag cleared");
+}
+
+String createStatusJson() {
+    // Basic status JSON implementation
+    String status = "{";
+    status += "\"state\":\"" + String(getCurrentStateName()) + "\",";
+    status += "\"timestamp\":" + String(millis());
+    status += "}";
+    return status;
 } 

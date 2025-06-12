@@ -12,6 +12,7 @@
 #include "../../include/system/StateMachine.h" // Include StateMachine header
 #include <WebSocketsServer.h>     // For webSocket.loop()
 
+
 // External references to stepper motors
 extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
@@ -422,6 +423,6 @@ void paintSide3Pattern() {
 
     //! Transition to Homing State
     Serial.println("Side 3 painting complete. Transitioning to Homing State...");
-    stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call
+    changeState(MachineState::HOMING);  // Use function-based approach
     // No return needed as function is void
 } 

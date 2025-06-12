@@ -7,10 +7,11 @@
 // #include "system/machine_state.h" // No longer needed
 #include "hardware/paintGun_Functions.h"
 #include "hardware/pressurePot_Functions.h"
-#include "system/StateMachine.h" // Added include
+#include "system/StateMachine.h"  // Updated include
 // #include "hardware/Brush_Functions.h" // File does not exist
 #include "../../include/motors/Rotation_Motor.h" // Added for rotateToAngle
 #include "../../include/settings/painting.h"   // Added for SIDE4_ROTATION_ANGLE
+
 
 // External variable for pressure pot state
 extern bool isPressurePot_ON;
@@ -20,9 +21,6 @@ extern void PressurePot_OFF();
 
 // External servo instance
 extern ServoMotor myServo;
-
-// Reference to the global state machine instance
-extern StateMachine* stateMachine;
 
 // Cleaning state variables
 bool cleaningInProgress = false;
@@ -68,7 +66,7 @@ void CleaningState::enter() {
     // This is called here assuming 'paintAllSides' will always start with Side 4 after cleaning.
     // If cleaning is used for other purposes, this might need more sophisticated logic
     // to determine which angle to rotate to, or if rotation is needed at all.
-    if (stateMachine && stateMachine->isTransitioningToPaintAllSides()) { // Hypothetical check
+    if (isIdleState() && isTransitioningToPaintAllSides()) { // Use function-based check
         Serial.println("CleaningState: Initiating rotation to Side 4 angle during cleaning prep.");
         rotateToAngle(SIDE4_ROTATION_ANGLE); // Rotate for the first side of 'paintAllSides'
     } else {
@@ -121,28 +119,11 @@ void CleaningState::update() {
         _isCleaning = false;
     }
     
-    // If cleaning is marked as complete, transition
+    // If cleaning is marked as complete, transition to idle
     if (_cleaningComplete) {
-        State* overrideState = nullptr;
-        if (stateMachine) { // Check stateMachine first
-            overrideState = stateMachine->getNextStateOverrideAndClear();
-        }
-
-        if (overrideState) {
-            Serial.println("CleaningState: Short clean complete. Transitioning to override state.");
-            // shortMode = false; // Reset mode before leaving - already in exit()
-            if(stateMachine) stateMachine->changeState(overrideState);
-        } else {
-            Serial.println("CleaningState: Normal clean complete. Transitioning to Idle State.");
-            // shortMode = false; // Reset mode before leaving - already in exit()
-            if (stateMachine) {
-                 stateMachine->changeState(stateMachine->getIdleState());
-            } else {
-                Serial.println("ERROR: StateMachine pointer null. Cannot transition to Idle.");
-            }
-        }
+        Serial.println("CleaningState: Cleaning complete. Transitioning to Idle State.");
+        changeState(MachineState::IDLE);
         _cleaningComplete = false; // Reset for next entry
-        // shortMode = false; // Moved to exit() for robustness
     }
 }
 
