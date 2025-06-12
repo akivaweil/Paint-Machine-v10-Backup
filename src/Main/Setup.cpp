@@ -18,7 +18,7 @@
 #include "persistence/Persistence.h"
 #include "persistence/PaintingSettings.h"
 #include "states/HomingState.h"
-#include "states/StateMachine.h"
+#include "system/StateMachine.h" // Function-based StateMachine
 #include <Preferences.h>
 #include "web/Web_Dashboard_Commands.h" // For loadPnpSettingsFromNVS
 #include "hardware/GlobalDebouncers.h" // For initializeGlobalDebouncers
@@ -45,8 +45,7 @@ bool webSocketServerStarted = false;
 // --- External Function Declarations ---
 extern void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length);
 
-// Reference to the global state machine instance
-extern StateMachine* stateMachine;
+// Function-based StateMachine - no extern needed
 
 //! Initialize Web Communications (WiFi, WebServer, WebSocket)
 void initializeWebCommunications() {
@@ -261,13 +260,8 @@ void initializeSystem() {
     // homeAllAxes will log its completion or errors internally
     
     // Instead of calling homeAllAxes directly, transition to HomingState
-    if (stateMachine) {
-        Serial.println("Initiating homing sequence via State Machine...");
-        stateMachine->changeState(stateMachine->getHomingState());
-    } else {
-        Serial.println("ERROR: StateMachine pointer is null. Cannot initiate homing!");
-        // Consider setting an error state or handling this
-    }
+    Serial.println("Initiating homing sequence via State Machine...");
+    changeState(MachineState::HOMING);
 }
 
 void setupHardware() {

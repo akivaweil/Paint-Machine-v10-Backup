@@ -138,15 +138,9 @@ void HomingState::update() {
             // Future: Transition to ErrorState?
         }
         
-        if (stateMachine) {
-            stateMachine->changeState(stateMachine->getIdleState()); 
-            // Reset flag for next entry after transition
-            _homingComplete = false; 
-        } else {
-            Serial.println("ERROR: StateMachine pointer null in HomingState::update()! Cannot transition.");
-             // Prevent potential infinite loop if stateMachine is null
-             _homingComplete = false; 
-        }
+        changeState(MachineState::IDLE);
+        // Reset flag for next entry after transition
+        _homingComplete = false;
     }
 }
 

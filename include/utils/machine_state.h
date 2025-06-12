@@ -2,6 +2,7 @@
 #define MACHINE_STATE_H
 
 #include <Arduino.h>
+#include "system/StateMachine.h" // For enum definitions
 
 // Machine state constants (keeping for compatibility)
 #define MACHINE_IDLE        0

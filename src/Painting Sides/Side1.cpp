@@ -12,6 +12,7 @@
 #include "settings/pins.h"        // Keep this one
 #include "../../include/web/Web_Dashboard_Commands.h" // For checkForHomeCommand
 #include "../../include/system/StateMachine.h" // Include StateMachine header
+#include <WebSocketsServer.h>     // For webSocket.loop()
 
 // External references to stepper motors
 extern FastAccelStepper *stepperX;
@@ -20,7 +21,50 @@ extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 extern ServoMotor myServo; // Declare external servo instance
 extern PaintingSettings paintingSettings; // Make sure global instance is accessible
-extern StateMachine* stateMachine; // Declare external state machine instance
+extern WebSocketsServer webSocket;    // For immediate command processing
+
+// External references to immediate command system
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
+
+// Function to check for immediate commands during painting operations
+bool checkForImmediateCommandsSide1() {
+    // Process any pending WebSocket events to catch immediate commands
+    webSocket.loop();
+    
+    // Check for immediate commands
+    if (immediateCommandPending) {
+        Serial.println("*** IMMEDIATE COMMAND DETECTED during Side1 painting - ABORTING NOW! ***");
+        Serial.printf("*** Command: %s, Client: %d ***\n", pendingCommand.c_str(), pendingCommandClientNum);
+        
+        // Stop all motors immediately
+        if (stepperX && stepperX->isRunning()) {
+            Serial.println("*** FORCE STOPPING X MOTOR ***");
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        }
+        if (stepperY_Left && stepperY_Left->isRunning()) {
+            Serial.println("*** FORCE STOPPING Y_LEFT MOTOR ***");
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        }
+        if (stepperY_Right && stepperY_Right->isRunning()) {
+            Serial.println("*** FORCE STOPPING Y_RIGHT MOTOR ***");
+            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+        }
+        if (stepperZ && stepperZ->isRunning()) {
+            Serial.println("*** FORCE STOPPING Z MOTOR ***");
+            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        }
+        
+        // Turn off paint gun for safety
+        Serial.println("*** FORCE TURNING OFF PAINT GUN ***");
+        paintGun_OFF();
+        
+        return true; // Immediate command pending
+    }
+    
+    return false; // No immediate commands
+}
 
 //* ************************************************************************
 //* *************************** SIDE 1 *************************************
@@ -28,7 +72,7 @@ extern StateMachine* stateMachine; // Declare external state machine instance
 
 // Simplified hardcoded painting function - no pauses or checks
 bool paintSide1Pattern() {
-    Serial.println("Starting Side 1 Pattern Painting - Simplified Version");
+    Serial.println("Starting Side 1 Pattern Painting - With Immediate Command Support");
 
     //! Set Servo Angle
     int servoAngle = paintingSettings.getServoAngleSide1();
@@ -63,7 +107,7 @@ bool paintSide1Pattern() {
     long xSpeed = paintingSettings.getSide1PaintingXSpeed();
     long finalX = startX + shiftXDistance;
     long paintStartX = startX + (long)(0.25f * STEPS_PER_INCH_XYZ);
-    long paintStopX = finalX - (long)(0.75f * STEPS_PER_INCH_XYZ);
+    long paintStopX = finalX - (long)(1.0f * STEPS_PER_INCH_XYZ);
 
     Serial.println("Side 1 Pattern: Executing continuous X movement with paint gun control");
 
@@ -74,8 +118,15 @@ bool paintSide1Pattern() {
     bool paintGunOn = false;
     
     // Monitor movement and control paint gun based on position
+    // **CRITICAL FIX**: Add immediate command checking during motion
     while (stepperX->isRunning()) {
         long currentX = stepperX->getCurrentPosition();
+        
+        // **KEY ENHANCEMENT**: Check for immediate commands during motion
+        if (checkForImmediateCommandsSide1()) {
+            Serial.println("*** Side 1 painting ABORTED due to immediate command ***");
+            return false; // Exit immediately
+        }
         
         // Turn paint gun ON when reaching paint start position
         if (!paintGunOn && currentX >= paintStartX) {
@@ -109,7 +160,7 @@ bool paintSide1Pattern() {
 
     //! Stage 5: Transition back to Homing State after completion
     Serial.println("Side 1 painting complete. Transitioning to Homing State...");
-    stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call
+    changeState(MachineState::HOMING);
 
     return true;
 }

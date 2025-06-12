@@ -422,6 +422,6 @@ void paintSide3Pattern() {
 
     //! Transition to Homing State
     Serial.println("Side 3 painting complete. Transitioning to Homing State...");
-    stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call
+    changeState(MachineState::HOMING);
     // No return needed as function is void
 } 

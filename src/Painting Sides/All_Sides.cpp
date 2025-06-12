@@ -306,7 +306,7 @@ void paintAllSides() {
     
     if (stateMachine) {
         // Change to homing state - this will properly home all axes including rotation
-        stateMachine->changeState(stateMachine->getHomingState());
+        changeState(MachineState::HOMING);
         Serial.println("Changed to homing state for proper axis positioning.");
     } else {
         Serial.println("ERROR: StateMachine not available for homing. Performing basic cleanup.");

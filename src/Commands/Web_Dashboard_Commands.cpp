@@ -423,7 +423,7 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
             homeCommandReceived = true;
             
             // Change to homing state immediately
-            stateMachine->changeState(stateMachine->getHomingState());
+            changeState(MachineState::HOMING);
             webSocket->sendTXT(num, "CMD_ACK: Homing sequence initiated.");
         } else {
              webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
@@ -432,12 +432,8 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     else if (baseCommandAction == "START_PNP") { // Changed command name
         // Trigger PnP state via StateMachine - NEW WAY
         Serial.println("Transitioning to PnP State via web command...");
-        if (stateMachine) {
-            stateMachine->changeState(stateMachine->getPnpState());
-            webSocket->sendTXT(num, "CMD_ACK: PnP State initiated.");
-        } else {
-            webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
-        }
+        changeState(MachineState::PNP);
+        webSocket->sendTXT(num, "CMD_ACK: PnP State initiated.");
     }
     else if (baseCommandAction == "PAINT_GUN_ON") {
         // Turn on paint gun
@@ -1745,7 +1741,7 @@ void setupWebDashboardCommands() {
 }
 
 // External references to global variables
-extern StateMachine* stateMachine;
+// Function-based StateMachine - no extern needed
 extern bool isPaused;
 
 // Add global flag for immediate command execution
