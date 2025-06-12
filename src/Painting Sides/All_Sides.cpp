@@ -1,19 +1,19 @@
 #include <Arduino.h>
 #include "motors/PaintingSides.h"
 #include "../../include/web/Web_Dashboard_Commands.h"
-#include "motors/servo_motor.h"
+#include "motors/ServoMotor.h"
 #include "hardware/paintGun_Functions.h"
 #include "hardware/pressurePot_Functions.h"
 #include "motors/XYZ_Movements.h"
 #include "utils/settings.h"
 #include <FastAccelStepper.h>
-#include "motors/homing.h"
+#include "motors/Homing.h"
 #include "motors/Rotation_Motor.h"
 #include "system/StateMachine.h"
 #include "system/GlobalState.h"    // For isPaused
 #include <WebSocketsServer.h>     // For webSocket.loop()
 
-// Removed extern ServoMotor - using function-based approach
+extern ServoMotor myServo;
 extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
 extern FastAccelStepper *stepperY_Right;
@@ -21,7 +21,7 @@ extern FastAccelStepper *stepperZ;
 extern bool isPressurePot_ON;
 extern FastAccelStepperEngine engine;
 extern FastAccelStepper *rotationStepper;
-// Function-based StateMachine - no extern needed
+extern StateMachine* stateMachine;
 extern WebSocketsServer webSocket;    // For pause loop
 
 // External references to immediate command system
@@ -91,7 +91,7 @@ bool checkForImmediateCommands() {
 
 // Helper function to prepare for the next painting sequence
 void _prepareForPaintingSequence() {
-    setServoAngle(0);
+    myServo.setAngle(0);
     Serial.println("Reset servo angle to 0 degrees before painting sequence");
     
     paintGun_OFF();
@@ -230,7 +230,7 @@ void paintAllSides() {
         //! INTER-COAT DELAY AND LOADING BAR
         //! ************************************************************************
         Serial.println("Setting servo to 180 degrees for inter-coat movement.");
-        setServoAngle(180);
+        myServo.setAngle(180);
         Serial.println("Servo set to 180 degrees during inter-coat delay.");
         
         Serial.println("Preparing for inter-coat delay: Moving X to loading bar start position.");
@@ -304,7 +304,19 @@ void paintAllSides() {
     //! ************************************************************************
     Serial.println("Initiating homing sequence using proper homing state...");
     
-    // Change to homing state - this will properly home all axes including rotation
-    changeState(MachineState::HOMING);
-    Serial.println("Changed to homing state for proper axis positioning.");
+    if (stateMachine) {
+        // Change to homing state - this will properly home all axes including rotation
+        stateMachine->changeState(stateMachine->getHomingState());
+        Serial.println("Changed to homing state for proper axis positioning.");
+    } else {
+        Serial.println("ERROR: StateMachine not available for homing. Performing basic cleanup.");
+        
+        // Fallback: Stop all motors if state machine is not available
+        if (stepperX->isRunning()) stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        if (stepperY_Left->isRunning()) stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        if (rotationStepper && rotationStepper->isRunning()) {
+            rotationStepper->forceStopAndNewPosition(rotationStepper->getCurrentPosition());
+        }
+    }
 } 

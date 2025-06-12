@@ -5,14 +5,15 @@
 #include <ArduinoOTA.h>
 #include <WebSocketsServer.h>
 #include "system/StateMachine.h"  // Now in include directory!
-#include "motors/servo_motor.h"
-#include "storage/persistence.h"
-#include "storage/painting_settings.h"
+#include "motors/ServoMotor.h"
+#include "storage/Persistence.h"
+#include "storage/PaintingSettings.h"
 
 // Include headers for functions called in loop
 #include "web/Web_Dashboard_Commands.h" // For runDashboardServer()
 
-// Function-based state machine (no class needed)
+// State machine
+extern StateMachine* stateMachine;
 
 extern WebSocketsServer webSocket;
 extern bool webSocketServerStarted;
@@ -22,8 +23,8 @@ unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 10;
 const int servoPin = 4;
 
-// Removed ServoMotor class - using function-based approach
-// Removed extern PaintingSettings - using function-based approach
+ServoMotor myServo(servoPin);
+extern PaintingSettings paintingSettings;
 
 // Define the global flag previously in machine_state.cpp
 volatile bool homeCommandReceived = false;
@@ -41,14 +42,15 @@ void processImmediateCommand();
 //* ************************************************************************
 
 void setup() {
-  // Initialize function-based state machine
+  // Initialize class-based state machine *before* system initialization
+  stateMachine = new StateMachine();
+
   initializeSystem();
-  initializeStateMachine();
   setupWebDashboardCommands(); // Initialize pins and settings for web commands
   
   // Initialize servo after settings are loaded
-  int initialServoAngle = getServoAngleSide1(); // Get initial angle from loaded settings
-  initServoMotor(servoPin, initialServoAngle);
+  int initialServoAngle = paintingSettings.getServoAngleSide1(); // Get initial angle from loaded settings
+  myServo.init(initialServoAngle);
   Serial.printf("Servo Initialized at: %d degrees\n", initialServoAngle);
 
   // Any setup code that *must* run after initializeSystem()
@@ -62,8 +64,10 @@ void loop() {
   // **REVOLUTIONARY CHANGE**: Process WebSocket events MULTIPLE times per loop
   runDashboardServer(); // Now processes WebSocket events 15+ times per call!
   
-  // Update function-based state machine with immediate command processing
-  updateStateMachine();
+  // Update enhanced state machine with immediate command processing
+  if (stateMachine) {
+    stateMachine->update();
+  }
   
   // **ADDITIONAL WebSocket processing** after state update for maximum responsiveness
   webSocket.loop();

@@ -9,16 +9,15 @@
 //* ************************************************************************
 
 class Persistence {
-private:
+public:
     Preferences preferences;
     const char* namespace_name = "paintmach"; // Namespace for Preferences library (max 15 chars)
     const char* INIT_FLAG_KEY = "initialized"; // Key for initialization flag
 
 public:
-    // Transaction Management
-    void beginTransaction(bool readOnly = false);
-    void endTransaction(); // Renamed from commitChanges
-
+    // Initialize settings manager
+    // void begin();
+    
     // First-time initialization check
     bool isInitialized();
     void saveFirstTimeFlag();
@@ -42,10 +41,10 @@ public:
     // Clear all settings
     void clearAll();
     
-    // Commit changes to NVS - REMOVED (Renamed to endTransaction)
-    // void commitChanges();
+    // Commit changes to NVS
+    void commitChanges();
 
-    // Close preferences (call when done) - REMOVED
+    // Close preferences (call when done)
     // void end();
 };
 
@@ -53,14 +52,10 @@ public:
 extern Persistence persistence;
 
 // Define keys for settings
-// const char* const SERVO_ANGLE_SIDE1_KEY = "srvAng1"; // REMOVED - Handled by PaintingSettings
-// const char* const SERVO_ANGLE_SIDE2_KEY = "srvAng2"; // REMOVED - Handled by PaintingSettings
-// const char* const SERVO_ANGLE_SIDE3_KEY = "srvAng3"; // REMOVED - Handled by PaintingSettings
-// const char* const SERVO_ANGLE_SIDE4_KEY = "srvAng4"; // REMOVED - Handled by PaintingSettings
-const char* const SERVO_ANGLE_SIDE1_KEY = "srvAng1"; // Re-added
-const char* const SERVO_ANGLE_SIDE2_KEY = "srvAng2"; // Re-added
-const char* const SERVO_ANGLE_SIDE3_KEY = "srvAng3"; // Re-added
-const char* const SERVO_ANGLE_SIDE4_KEY = "srvAng4"; // Re-added
+const char* const SERVO_ANGLE_SIDE1_KEY = "srvAng1";
+const char* const SERVO_ANGLE_SIDE2_KEY = "srvAng2";
+const char* const SERVO_ANGLE_SIDE3_KEY = "srvAng3";
+const char* const SERVO_ANGLE_SIDE4_KEY = "srvAng4";
 
 // Keys for other painting settings
 const char* const PAINT_SPEED_KEY = "pntSpd";

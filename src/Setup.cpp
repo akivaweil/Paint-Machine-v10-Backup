@@ -15,11 +15,10 @@
 #include <ArduinoOTA.h>
 #include "motors/XYZ_Movements.h"
 #include "motors/Rotation_Motor.h"
-#include "storage/persistence.h"
-#include "storage/painting_settings.h"
-// Removed old HomingState.h include - using function-based StateMachine
-#include "system/StateMachine.h" // Function-based StateMachine
-#include "motors/homing.h" // For initializeHoming
+#include "persistence/Persistence.h"
+#include "persistence/PaintingSettings.h"
+#include "states/HomingState.h"
+#include "states/StateMachine.h"
 #include <Preferences.h>
 #include "web/Web_Dashboard_Commands.h" // For loadPnpSettingsFromNVS
 #include "hardware/GlobalDebouncers.h" // For initializeGlobalDebouncers
@@ -46,7 +45,8 @@ bool webSocketServerStarted = false;
 // --- External Function Declarations ---
 extern void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length);
 
-// Function-based StateMachine - no extern needed
+// Reference to the global state machine instance
+extern StateMachine* stateMachine;
 
 //! Initialize Web Communications (WiFi, WebServer, WebSocket)
 void initializeWebCommunications() {
@@ -176,9 +176,6 @@ void initializeMotorsAndSwitches() {
     // Initialize global debouncers (includes PNP Cycle Sensor)
     initializeGlobalDebouncers(); 
 
-    // Initialize homing system with the steppers
-    initializeHoming(engine, stepperX, stepperY_Left, stepperY_Right, stepperZ);
-
     // Serial.println("Motors and Switches Initialized.");
 }
 
@@ -220,7 +217,7 @@ void initializeSettings() {
     // persistence.begin(); // REMOVED - begin/end handled transactionally now
     
     // Now initialize PaintingSettings, which might load or reset/save
-    initializePaintingSettings();
+    paintingSettings.begin();
 
     // Load PNP motion settings from NVS
     loadPnpSettingsFromNVS();
@@ -264,8 +261,13 @@ void initializeSystem() {
     // homeAllAxes will log its completion or errors internally
     
     // Instead of calling homeAllAxes directly, transition to HomingState
-    Serial.println("Initiating homing sequence via State Machine...");
-    changeState(MachineState::HOMING);
+    if (stateMachine) {
+        Serial.println("Initiating homing sequence via State Machine...");
+        stateMachine->changeState(stateMachine->getHomingState());
+    } else {
+        Serial.println("ERROR: StateMachine pointer is null. Cannot initiate homing!");
+        // Consider setting an error state or handling this
+    }
 }
 
 void setupHardware() {

@@ -5,9 +5,9 @@
 #include "../../include/hardware/paintGun_Functions.h" // For paintGun_ON/OFF
 #include "../../include/hardware/pressurePot_Functions.h" // For PressurePot_ON
 #include "../../include/settings/painting.h"         // For painting-specific constants (SIDE3_Z_HEIGHT etc.)
-#include "storage/painting_settings.h" // Function-based painting settings
+#include "../../include/persistence/PaintingSettings.h" // Include for accessing saved settings
 #include <FastAccelStepper.h>
-#include "motors/servo_motor.h"         // For ServoMotor class
+#include "../../include/motors/ServoMotor.h"         // For ServoMotor class
 #include "../../include/web/Web_Dashboard_Commands.h" // For checkForHomeCommand
 #include "../../include/system/StateMachine.h" // Include StateMachine header
 #include <WebSocketsServer.h>     // For webSocket.loop()
@@ -17,9 +17,9 @@ extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
 extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
-// Removed extern ServoMotor - using function-based approach
-// Removed extern PaintingSettings - using function-based approach
-// Function-based StateMachine - no extern needed
+extern ServoMotor myServo;
+extern PaintingSettings paintingSettings; // Make sure global instance is accessible
+extern StateMachine* stateMachine; // Declare external state machine instance
 extern WebSocketsServer webSocket;    // For immediate command processing
 
 // External references to immediate command system
@@ -100,18 +100,18 @@ bool checkForImmediateCommandsSide3() {
 void paintSide3Pattern() {
     Serial.println("Starting Side 3 Pattern Painting (Horizontal Sweeps) - WITH IMMEDIATE COMMAND SUPPORT");
 
-    int servoAngle = getServoAngleSide3();
+    int servoAngle = paintingSettings.getServoAngleSide3();
 
     //! Set Servo Angle FIRST
-    setServoAngle(servoAngle);
+    myServo.setAngle(servoAngle);
     Serial.println("Servo set to: " + String(servoAngle) + " degrees for Side 3 side");
 
     //! STEP 0: Turn on pressure pot
     PressurePot_ON();
 
     //! STEP 1: Move to side 3 painting Z height
-    long zPos = (long)(getSide3ZHeight() * STEPS_PER_INCH_XYZ);
-    long sideZPos = (long)(getSide3SideZHeight() * STEPS_PER_INCH_XYZ);
+    long zPos = (long)(paintingSettings.getSide3ZHeight() * STEPS_PER_INCH_XYZ);
+    long sideZPos = (long)(paintingSettings.getSide3SideZHeight() * STEPS_PER_INCH_XYZ);
 
     moveToXYZ(stepperX->getCurrentPosition(), DEFAULT_X_SPEED,
               stepperY_Left->getCurrentPosition(), DEFAULT_Y_SPEED,
@@ -122,8 +122,8 @@ void paintSide3Pattern() {
     Serial.println("Rotated to side 3 position");
 
     //! STEP 3: Move to start position (Top Right - P1 assumed)
-    long startX_steps = (long)(getSide3StartX() * STEPS_PER_INCH_XYZ);
-    long startY_steps = (long)(getSide3StartY() * STEPS_PER_INCH_XYZ);
+    long startX_steps = (long)(paintingSettings.getSide3StartX() * STEPS_PER_INCH_XYZ);
+    long startY_steps = (long)(paintingSettings.getSide3StartY() * STEPS_PER_INCH_XYZ);
     moveToXYZ(startX_steps, DEFAULT_X_SPEED, startY_steps, DEFAULT_Y_SPEED, sideZPos, DEFAULT_Z_SPEED);
     Serial.println("Moved to side 3 pattern start position (Top Right)");
 
@@ -133,11 +133,11 @@ void paintSide3Pattern() {
     //! STEP 5: Execute side 3 horizontal painting pattern
     long currentX = startX_steps;
     long currentY = startY_steps;
-    long sweepX_steps = (long)(getSide3ShiftX() * STEPS_PER_INCH_XYZ); 
-    long shiftY_steps = (long)(getSide3SweepY() * STEPS_PER_INCH_XYZ); 
+    long sweepX_steps = (long)(paintingSettings.getSide3ShiftX() * STEPS_PER_INCH_XYZ); 
+    long shiftY_steps = (long)(paintingSettings.getSide3SweepY() * STEPS_PER_INCH_XYZ); 
 
-    long paint_x_speed = getSide3PaintingXSpeed();
-    long paint_y_speed = getSide3PaintingYSpeed();
+    long paint_x_speed = paintingSettings.getSide3PaintingXSpeed();
+    long paint_y_speed = paintingSettings.getSide3PaintingYSpeed();
     long final_sweep_paint_x_speed_side3 = (long)(paint_x_speed * 0.75f);
     long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 
@@ -422,6 +422,6 @@ void paintSide3Pattern() {
 
     //! Transition to Homing State
     Serial.println("Side 3 painting complete. Transitioning to Homing State...");
-    changeState(MachineState::HOMING);
+    stateMachine->changeState(stateMachine->getHomingState()); // Corrected state change call
     // No return needed as function is void
 } 

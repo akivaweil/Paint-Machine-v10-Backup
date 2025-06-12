@@ -6,64 +6,19 @@
 #include "../../include/hardware/pressurePot_Functions.h"
 #include <FastAccelStepper.h>
 #include "../../include/settings/painting.h"
-#include "motors/servo_motor.h"
-#include "storage/painting_settings.h"
+#include "../../include/motors/ServoMotor.h"
+#include "../../include/persistence/PaintingSettings.h"
 #include "../../include/web/Web_Dashboard_Commands.h"
 #include "../../include/system/StateMachine.h"
-#include <WebSocketsServer.h>     // For webSocket.loop()
 
 // External references to stepper motors
 extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
 extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
-// Removed extern ServoMotor - using function-based approach
-// Removed extern PaintingSettings - using function-based approach
-// Function-based StateMachine - no extern needed
-extern WebSocketsServer webSocket;    // For immediate command processing
-
-// External references to immediate command system
-extern bool immediateCommandPending;
-extern String pendingCommand;
-extern uint8_t pendingCommandClientNum;
-
-// Function to check for immediate commands during painting operations
-bool checkForImmediateCommandsSide4() {
-    // Process any pending WebSocket events to catch immediate commands
-    webSocket.loop();
-    
-    // Check for immediate commands
-    if (immediateCommandPending) {
-        Serial.println("*** IMMEDIATE COMMAND DETECTED during Side4 painting - ABORTING NOW! ***");
-        Serial.printf("*** Command: %s, Client: %d ***\n", pendingCommand.c_str(), pendingCommandClientNum);
-        
-        // Stop all motors immediately
-        if (stepperX && stepperX->isRunning()) {
-            Serial.println("*** FORCE STOPPING X MOTOR ***");
-            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-        }
-        if (stepperY_Left && stepperY_Left->isRunning()) {
-            Serial.println("*** FORCE STOPPING Y_LEFT MOTOR ***");
-            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
-        }
-        if (stepperY_Right && stepperY_Right->isRunning()) {
-            Serial.println("*** FORCE STOPPING Y_RIGHT MOTOR ***");
-            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
-        }
-        if (stepperZ && stepperZ->isRunning()) {
-            Serial.println("*** FORCE STOPPING Z MOTOR ***");
-            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
-        }
-        
-        // Turn off paint gun for safety
-        Serial.println("*** FORCE TURNING OFF PAINT GUN ***");
-        paintGun_OFF();
-        
-        return true; // Immediate command pending
-    }
-    
-    return false; // No immediate commands
-}
+extern ServoMotor myServo;
+extern PaintingSettings paintingSettings;
+extern StateMachine* stateMachine;
 
 //* ************************************************************************
 //* ************************** SIDE 4 PAINTING ***************************
@@ -81,20 +36,20 @@ bool checkForImmediateCommandsSide4() {
 void paintSide4Pattern() {
     Serial.println("Starting Side 4 Pattern Painting (New Logic - Swapped from Side 2)");
 
-    int servoAngle = getServoAngleSide4(); // Use Side 4 settings
-    long zPos = (long)(getSide4ZHeight() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
-    long sideZPos = (long)(getSide4SideZHeight() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
-    long startX_steps = (long)(getSide4StartX() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
-    long startY_steps = (long)(getSide4StartY() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
-    long sweepYDistance = (long)(getSide4SweepY() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
-    long shiftXDistance = (long)(getSide4ShiftX() * STEPS_PER_INCH_XYZ); // Use Side 4 settings - ensure this is positive for +X shift
-    long paint_x_speed = getSide4PaintingXSpeed(); // Use Side 4 settings
-    long paint_y_speed = getSide4PaintingYSpeed(); // Use Side 4 settings
+    int servoAngle = paintingSettings.getServoAngleSide4(); // Use Side 4 settings
+    long zPos = (long)(paintingSettings.getSide4ZHeight() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
+    long sideZPos = (long)(paintingSettings.getSide4SideZHeight() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
+    long startX_steps = (long)(paintingSettings.getSide4StartX() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
+    long startY_steps = (long)(paintingSettings.getSide4StartY() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
+    long sweepYDistance = (long)(paintingSettings.getSide4SweepY() * STEPS_PER_INCH_XYZ); // Use Side 4 settings
+    long shiftXDistance = (long)(paintingSettings.getSide4ShiftX() * STEPS_PER_INCH_XYZ); // Use Side 4 settings - ensure this is positive for +X shift
+    long paint_x_speed = paintingSettings.getSide4PaintingXSpeed(); // Use Side 4 settings
+    long paint_y_speed = paintingSettings.getSide4PaintingYSpeed(); // Use Side 4 settings
     long initial_sweep_paint_y_speed_side4 = (long)(paint_y_speed * 0.75f); // Renamed from final_sweep_paint_y_speed_side4
     long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 
     //! Set Servo Angle FIRST
-    setServoAngle(servoAngle);
+    myServo.setAngle(servoAngle);
     Serial.println("Servo set to: " + String(servoAngle) + " degrees for Side 4");
 
     //! Rotate the tray to 90 degrees for Side 4
@@ -179,12 +134,6 @@ void paintSide4Pattern() {
                     paintGunDeactivated = true;
                 }
                 
-                // **KEY ENHANCEMENT**: Check for immediate commands during motor movement
-                if (checkForImmediateCommandsSide4()) {
-                    Serial.println("*** Side 4 painting ABORTED due to immediate command ***");
-                    return; // Exit immediately
-                }
-                
                 if (checkForPauseCommand()) {
                     stepperY_Left->forceStop();
                     stepperY_Right->forceStop();
@@ -241,12 +190,6 @@ void paintSide4Pattern() {
                 if (paintGunActivated && !paintGunDeactivated && elapsedSeconds >= timeToStop) {
                     paintGun_OFF();
                     paintGunDeactivated = true;
-                }
-                
-                // **KEY ENHANCEMENT**: Check for immediate commands during motor movement
-                if (checkForImmediateCommandsSide4()) {
-                    Serial.println("*** Side 4 painting ABORTED due to immediate command ***");
-                    return; // Exit immediately
                 }
                 
                 // Process WebSocket events frequently during movement
@@ -306,7 +249,7 @@ void paintSide4Pattern() {
     }
 
     //! Set Servo Angle and Z height for final X pass
-    setServoAngle(85);
+    myServo.setAngle(85);
     Serial.println("Servo set to: 85 degrees for final X pass on Side 4");
     long finalXPassZPos_Side4 = (long)(-1.75 * STEPS_PER_INCH_XYZ);
     Serial.printf("Side 4 Pattern: Setting Z to %.2f inches for final X pass\n", -1.75);
@@ -375,5 +318,5 @@ void paintSide4Pattern() {
 
     //! Transition to Homing State
     Serial.println("Side 4 painting complete. Transitioning to Homing State...");
-    changeState(MachineState::HOMING);
+    stateMachine->changeState(stateMachine->getHomingState());
 }

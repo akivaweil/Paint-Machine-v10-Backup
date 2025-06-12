@@ -26,8 +26,9 @@
 #include "states/IdleState.h" // Include IdleState for comparison
 #include "settings/motion.h" // Include for default PNP values
 #include "states/CleaningState.h" // Include for setShortMode
+#include "states/InspectTipState.h" // Include for InspectTipState
 #include <limits.h> // ADDED For LONG_MIN, INT_MIN
-#include "system/GlobalState.h" // ADDED for isPaused
+#include "system/GlobalState.h" // ADDED for isPaused and isActivePainting
 
 // --- PNP Settings Keys for NVS ---
 #define PNP_X_SPEED_KEY "pnpXSpd"
@@ -219,6 +220,39 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     Serial.print(num);
     Serial.print(": ");
     Serial.println(commandPayload);
+    
+    // Add timestamp for debugging command processing timing
+    Serial.print("[DEBUG] Processing command at: ");
+    Serial.println(millis());
+    
+    // Check if this is an immediate command that should interrupt current operations
+    String baseCommand = commandPayload;
+    int baseColonIndex = baseCommand.indexOf(':');
+    if (baseColonIndex != -1) {
+        baseCommand = baseCommand.substring(0, baseColonIndex);
+    }
+    baseCommand.toUpperCase();
+    
+    // If it's an immediate command and we're not already in idle state, flag for immediate processing
+    if (isImmediateCommand(baseCommand) && stateMachine && 
+        stateMachine->getCurrentState() != stateMachine->getIdleState()) {
+        Serial.print("IMMEDIATE COMMAND DETECTED: ");
+        Serial.println(baseCommand);
+        
+        // Set the immediate command flags
+        immediateCommandPending = true;
+        pendingCommand = commandPayload;
+        pendingCommandClientNum = num;
+        
+        // Also process immediately if it's a critical safety command
+        if (baseCommand == "HOME" || baseCommand == "HOME_ALL" || 
+            baseCommand == "PAUSE" || baseCommand == "PAINT_GUN_OFF") {
+            Serial.println("CRITICAL SAFETY COMMAND - Processing immediately");
+            // Process critical commands immediately for safety
+        }
+        
+        return; // Don't process normally, let main loop handle it
+    }
 
     String commandToProcess = commandPayload; // This will hold the actual command string for colon-parsing
 
@@ -235,14 +269,22 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
 
             // Handle PAUSE/RESUME first if they are sent as JSON commands
             if (json_command_field.equalsIgnoreCase("PAUSE")) {
+                Serial.print("[DEBUG] PAUSE command processing at: ");
+                Serial.println(millis());
                 isPaused = true;
-                Serial.println("[WS] PAUSE command received. System paused.");
+                Serial.println("[WS] PAUSE command received (JSON). System paused.");
                 webSocket->sendTXT(num, "CMD_ACK: System Paused");
                 webSocket->broadcastTXT("STATUS:PAUSED");
+                Serial.print("[DEBUG] PAUSE command completed at: ");
+                Serial.println(millis());
                 return;
             } else if (json_command_field.equalsIgnoreCase("RESUME")) {
+                Serial.print("[DEBUG] RESUME command processing at: ");
+                Serial.println(millis());
+                Serial.print("[WS] RESUME command received (JSON). isPaused was: ");
+                Serial.println(isPaused ? "true" : "false");
                 isPaused = false;
-                Serial.println("[WS] RESUME command received. System resumed.");
+                Serial.println("[WS] System resumed (JSON). isPaused now: false");
                 webSocket->sendTXT(num, "CMD_ACK: System Resumed");
                 webSocket->broadcastTXT("STATUS:RESUMED");
                 // Potentially broadcast current machine state after resuming
@@ -251,6 +293,8 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
                     stateMessage += stateMachine->getCurrentState()->getName();
                     webSocket->broadcastTXT(stateMessage);
                 }
+                Serial.print("[DEBUG] RESUME command completed at: ");
+                Serial.println(millis());
                 return;
             }
 
@@ -361,28 +405,6 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
 
     // --- COMMAND PROCESSING ---
     // Ensure all subsequent checks use 'baseCommandAction'
-
-    // Handle PAUSE/RESUME for non-JSON commands or if JSON parsing failed but command is simple
-    if (baseCommandAction == "PAUSE") {
-        isPaused = true;
-        Serial.println("[WS] PAUSE command received (plain text). System paused.");
-        webSocket->sendTXT(num, "CMD_ACK: System Paused");
-        webSocket->broadcastTXT("STATUS:PAUSED");
-        return;
-    } else if (baseCommandAction == "RESUME") {
-        isPaused = false;
-        Serial.println("[WS] RESUME command received (plain text). System resumed.");
-        webSocket->sendTXT(num, "CMD_ACK: System Resumed");
-        webSocket->broadcastTXT("STATUS:RESUMED");
-        // Potentially broadcast current machine state after resuming
-        if (stateMachine && stateMachine->getCurrentState()) {
-            String stateMessage = "STATE:";
-            stateMessage += stateMachine->getCurrentState()->getName();
-            webSocket->broadcastTXT(stateMessage);
-        }
-        return;
-    }
-
     if (baseCommandAction == "STATUS") {
         // Send back current status (e.g., state, positions)
         // sendWebStatus(webSocket, "STATUS_UPDATE"); // Call with a message or update internal logic
@@ -442,48 +464,103 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         webSocket->sendTXT(num, "PRESSURE_POT_STATUS:OFF"); // Send status back to UI
         Serial.printf("Pressure Pot Pin %d set to LOW\n", PRESSURE_POT_PIN);
     }
+    else if (baseCommandAction == "INSPECT_TIP_ON") {
+        Serial.println("Activating Inspect Tip mode via web command");
+        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getIdleState()) {
+            stateMachine->changeState(stateMachine->getInspectTipState());
+            webSocket->sendTXT(num, "CMD_ACK: Inspect Tip mode activated");
+        } else {
+            Serial.println("Inspect Tip command rejected: Machine not in IDLE state");
+            webSocket->sendTXT(num, "CMD_ERROR: Machine must be in IDLE state");
+        }
+    }
+    else if (baseCommandAction == "INSPECT_TIP_OFF") {
+        Serial.println("Deactivating Inspect Tip mode via web command");
+        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getInspectTipState()) {
+            // Cast to InspectTipState to call returnToIdle method
+            InspectTipState* inspectState = static_cast<InspectTipState*>(stateMachine->getInspectTipState());
+            inspectState->returnToIdle();
+            webSocket->sendTXT(num, "CMD_ACK: Inspect Tip mode deactivated");
+        } else {
+            Serial.println("Inspect Tip OFF command ignored: Not in Inspect Tip state");
+            webSocket->sendTXT(num, "CMD_ACK: Inspect Tip already off");
+        }
+    }
+    else if (baseCommandAction == "INSPECT_TIP_TO_PAINTING") {
+        Serial.println("Transitioning from Inspect Tip to Painting via web command");
+        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getInspectTipState()) {
+            // Cast to InspectTipState to call transitionToPainting method
+            InspectTipState* inspectState = static_cast<InspectTipState*>(stateMachine->getInspectTipState());
+            inspectState->transitionToPainting();
+            webSocket->sendTXT(num, "CMD_ACK: Transitioning from Inspect Tip to Painting");
+        } else {
+            Serial.println("Inspect Tip to Painting command ignored: Not in Inspect Tip state");
+            webSocket->sendTXT(num, "CMD_ERROR: Machine must be in Inspect Tip state");
+        }
+    }
+    else if (baseCommandAction == "INSPECT_TIP_TO_PNP") {
+        Serial.println("Transitioning from Inspect Tip to PnP via web command");
+        if (stateMachine && stateMachine->getCurrentState() == stateMachine->getInspectTipState()) {
+            // Cast to InspectTipState to call transitionToPnP method
+            InspectTipState* inspectState = static_cast<InspectTipState*>(stateMachine->getInspectTipState());
+            inspectState->transitionToPnP();
+            webSocket->sendTXT(num, "CMD_ACK: Transitioning from Inspect Tip to PnP");
+        } else {
+            Serial.println("Inspect Tip to PnP command ignored: Not in Inspect Tip state");
+            webSocket->sendTXT(num, "CMD_ERROR: Machine must be in Inspect Tip state");
+        }
+    }
     else if (baseCommandAction == "PAINT_SIDE_1") {
         Serial.println("Painting side 1...");
+        isActivePainting = true;
+        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide1Pattern(); // Call the function directly
+        isActivePainting = false;
+        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 1 initiated.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 1 completed.");
         // Transition to Homing state should be handled by the PaintingState or user interaction
     }
     else if (baseCommandAction == "PAINT_SIDE_2") {
         Serial.println("Painting side 2...");
+        isActivePainting = true;
+        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide2Pattern(); // Call directly
+        isActivePainting = false;
+        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 2 initiated.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 2 completed.");
     }
     else if (baseCommandAction == "PAINT_SIDE_3") {
         Serial.println("Painting side 3...");
+        isActivePainting = true;
+        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide3Pattern(); // Call directly
+        isActivePainting = false;
+        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 3 initiated.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 3 completed.");
     }
     else if (baseCommandAction == "PAINT_SIDE_4") {
         Serial.println("Painting side 4...");
+        isActivePainting = true;
+        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide4Pattern(); // Call directly
+        isActivePainting = false;
+        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 4 initiated.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 4 completed.");
     }
     else if (baseCommandAction == "PAINT_ALL_SIDES") {
         Serial.println("Painting all sides (single coat request)...");
         g_requestedCoats = 1; // Explicitly set 1 coat for this command
         if (stateMachine) {
             stateMachine->setTransitioningToPaintAllSides(true); // Set the flag
-            if (stateMachine->getCleaningState()) { // Ensure cleaning state exists
-                 static_cast<CleaningState*>(stateMachine->getCleaningState())->setShortMode(true); // Set short mode for initial clean
-            } else {
-                Serial.println("ERROR: WebDashboard - CleaningState not available to set short mode.");
-                // Optionally, handle this error, e.g., don't proceed or log more verbosely
-            }
-            stateMachine->setNextStateOverride(stateMachine->getPaintingState());
-            stateMachine->changeState(stateMachine->getCleaningState()); // Start with cleaning
+            stateMachine->changeState(stateMachine->getPaintingState()); // Go directly to painting
             webSocket->sendTXT(num, "CMD_ACK: Single All Sides paint sequence initiated."); // Inform user
         } else {
             Serial.println("ERROR: StateMachine pointer null. Cannot start Paint All Sides.");
@@ -533,13 +610,7 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
             // Check if machine is IDLE before starting multi-coat
             if (stateMachine->getCurrentState() == stateMachine->getIdleState()) {
                 stateMachine->setTransitioningToPaintAllSides(true); // Set the flag
-                if (stateMachine->getCleaningState()) { // Ensure cleaning state exists
-                    static_cast<CleaningState*>(stateMachine->getCleaningState())->setShortMode(true); // Set short mode for initial clean
-                } else {
-                    Serial.println("ERROR: WebDashboard - CleaningState not available to set short mode for multiple coats.");
-                }
-                stateMachine->setNextStateOverride(stateMachine->getPaintingState());
-                stateMachine->changeState(stateMachine->getCleaningState()); // Start with cleaning
+                stateMachine->changeState(stateMachine->getPaintingState()); // Go directly to painting
                 webSocket->sendTXT(num, "CMD_ACK: Multiple All Sides paint sequence initiated (" + String(numCoats) + " coats, " + String(interCoatDelaySec) + "s delay).");
             } else {
                  Serial.print("Command ");
@@ -582,12 +653,6 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         // Home all axes
         Serial.println("Homing all axes immediately...");
         
-        // Force stop any running motors first
-        if (stepperX->isRunning()) stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-        if (stepperY_Left->isRunning()) stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
-        if (stepperY_Right->isRunning()) stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
-        if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
-        
         // Set the home command received flag to interrupt any ongoing painting operations
         homeCommandReceived = true;
         
@@ -598,6 +663,33 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         } else {
             webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
         }
+    }
+    else if (baseCommandAction == "PAUSE") {
+        Serial.print("[DEBUG] PAUSE (plain) command processing at: ");
+        Serial.println(millis());
+        isPaused = true;
+        Serial.println("[WS] PAUSE command received. System paused.");
+        webSocket->sendTXT(num, "CMD_ACK: System Paused");
+        webSocket->broadcastTXT("STATUS:PAUSED");
+        Serial.print("[DEBUG] PAUSE (plain) command completed at: ");
+        Serial.println(millis());
+    }
+    else if (baseCommandAction == "RESUME") {
+        Serial.print("[DEBUG] RESUME (plain) command processing at: ");
+        Serial.println(millis());
+        isPaused = false;
+        Serial.println("[WS] RESUME command received (plain text). System resumed.");
+        webSocket->sendTXT(num, "CMD_ACK: System Resumed");
+        webSocket->broadcastTXT("STATUS:RESUMED");
+        // Potentially broadcast current machine state after resuming
+        if (stateMachine && stateMachine->getCurrentState()) {
+            String stateMessage = "STATE:";
+            stateMessage += stateMachine->getCurrentState()->getName();
+            webSocket->broadcastTXT(stateMessage);
+        }
+        Serial.print("[DEBUG] RESUME (plain) command completed at: ");
+        Serial.println(millis());
+        return;
     }
     else if (baseCommandAction == "MOVE_Z_PREVIEW") {
         float z_pos_inch = value1;
@@ -1272,13 +1364,24 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
 void processWebSocketEvents() {
   // Process WebSocket events to allow receiving commands
   // This is called during operations that need to be interruptible
-  webSocket.loop();
   
-  // Give some time for any WebSocket messages to be processed
-  // This ensures the webSocketEvent handler can set flags like homeCommandReceived
-  for (int i = 0; i < 10; i++) {
+  // Process WebSocket events multiple times to catch up with any backlog
+  for (int i = 0; i < 20; i++) {
     webSocket.loop();
     delay(1);
+  }
+}
+
+// Enhanced function for processing WebSocket events during critical operations
+// This function processes WebSocket events more aggressively and should be called
+// frequently during long-running operations to ensure immediate command processing
+void processWebSocketEventsFrequently() {
+  // Process WebSocket events more aggressively
+  for (int i = 0; i < 50; i++) {
+    webSocket.loop();
+    if (i % 10 == 0) {
+      delay(1); // Small delay every 10 iterations
+    }
   }
 }
 
@@ -1291,8 +1394,8 @@ extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 
 bool checkForHomeCommand() {
-  // Process any pending WebSocket events
-  processWebSocketEvents();
+  // Process any pending WebSocket events using enhanced processing
+  processWebSocketEventsFrequently();
   
   // Check if a home command was received
   if (homeCommandReceived) {
@@ -1314,6 +1417,47 @@ bool checkForHomeCommand() {
   }
   
   return false;
+}
+
+// Function to check for PAUSE command during painting operations
+// Returns true if the operation was aborted due to home command while paused
+bool checkForPauseCommand() {
+  static unsigned long lastCheckTime = 0;
+  unsigned long currentTime = millis();
+
+  // Log that the function is being called, but not too frequently to avoid spamming the serial monitor.
+  if (currentTime - lastCheckTime > 500) { // Log every 500ms
+    Serial.print("[DEBUG] checkForPauseCommand called. isPaused = ");
+    Serial.println(isPaused ? "true" : "false");
+    lastCheckTime = currentTime;
+  }
+
+  // Process any pending WebSocket events first using the enhanced function
+  processWebSocketEventsFrequently();
+  
+  // If paused, wait in a loop until unpaused or home command received
+  if (isPaused) { 
+    Serial.println("[DEBUG] PAUSED DETECTED. Entering wait loop.");
+    while (isPaused) {
+      // Continue processing WebSocket events while paused (more frequently)
+      processWebSocketEventsFrequently();
+      
+      // Check for home command while paused
+      if (homeCommandReceived) {
+        Serial.println("HOME command received while paused - aborting operation");
+        isPaused = false; // Clear pause state since we're aborting
+        return true; // Indicate that operation was aborted
+      }
+      
+      // Small delay to prevent this loop from consuming all CPU
+      delay(50); 
+      Serial.print("."); // Print a dot to show we are in the pause loop
+    }
+    Serial.println("\n[DEBUG] RESUMED. Exiting wait loop.");
+  }
+  
+  // Final check for home command even if not paused
+  return homeCommandReceived;
 }
 
 // Function to check and restart WebSocket if needed
@@ -1374,7 +1518,7 @@ void handleDashboardClient() {
     String currentLine = "";
     String request = ""; // Initialize request string
     unsigned long clientConnectTime = millis(); // Record connection time
-    const unsigned long clientReadTimeout = 5000; // 5 seconds timeout for reading request
+    const unsigned long clientReadTimeout = 20; // 5 seconds timeout for reading request
 
     while (dashboardClient.connected()) {
       if (dashboardClient.available()) {
@@ -1525,12 +1669,21 @@ void runDashboardServer() {
     // Ensure WebSocket is running if WiFi is connected
     ensureWebSocketRunning();
     
+    // **REVOLUTIONARY CHANGE**: Process WebSocket events MULTIPLE times per call
+    // This ensures immediate command processing even during long painting operations
+    for (int i = 0; i < 10; i++) {
+        webSocket.loop();
+    }
+    
     // Handle client requests
     handleDashboardClient();
     
-    // Handle WebSocket events
-    webSocket.loop();
-    delay(5); // CHANGED FROM 50. Main loop delay for server tasks
+    // **AGGRESSIVE WebSocket processing** after HTTP handling
+    for (int i = 0; i < 5; i++) {
+        webSocket.loop();
+    }
+    
+    // No delay here - let main loop control timing for maximum responsiveness
 }
 
 void stopDashboardServer() {
@@ -1590,4 +1743,29 @@ void setupWebDashboardCommands() {
     pinMode(PRESSURE_POT_PIN, OUTPUT);
     digitalWrite(PRESSURE_POT_PIN, LOW); // Ensure pressure pot is off initially
     Serial.printf("Pressure Pot Pin %d initialized as OUTPUT and set to LOW.\n", PRESSURE_POT_PIN);
+}
+
+// External references to global variables
+extern StateMachine* stateMachine;
+extern bool isPaused;
+
+// Add global flag for immediate command execution
+extern bool immediateCommandPending;
+extern String pendingCommand;
+extern uint8_t pendingCommandClientNum;
+
+// List of commands that should be executed immediately, interrupting current operations
+const String IMMEDIATE_COMMANDS[] = {
+    "HOME", "HOME_ALL", "PAUSE", "RESUME", "CLEAN_GUN", 
+    "PAINT_GUN_ON", "PAINT_GUN_OFF", "PRESSURE_POT_ON", "PRESSURE_POT_OFF"
+};
+const int NUM_IMMEDIATE_COMMANDS = sizeof(IMMEDIATE_COMMANDS) / sizeof(IMMEDIATE_COMMANDS[0]);
+
+bool isImmediateCommand(const String& command) {
+    for (int i = 0; i < NUM_IMMEDIATE_COMMANDS; i++) {
+        if (command.equalsIgnoreCase(IMMEDIATE_COMMANDS[i])) {
+            return true;
+        }
+    }
+    return false;
 }

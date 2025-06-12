@@ -6,24 +6,35 @@
 #include <FastAccelStepper.h>
 #include "utils/settings.h"
 #include "system/machine_state.h"
-#include "motors/Rotation_Motor.h"
-#include "settings/debounce_settings.h"
+#include "motors/Rotation_Motor.h" // Include Rotation_Motor for rotationStepper access
+#include "settings/debounce_settings.h" // Added for centralized debounce intervals
 
-//* ************************************************************************
-//* **************************** HOMING ***********************************
-//* ************************************************************************
+class Homing {
+public:
+    Homing(FastAccelStepperEngine& engine,
+           FastAccelStepper* stepperX,
+           FastAccelStepper* stepperY_Left,
+           FastAccelStepper* stepperY_Right,
+           FastAccelStepper* stepperZ);
+    
+    bool homeAllAxes();
 
-// Initialize homing system
-void initializeHoming(FastAccelStepperEngine& engine,
-                     FastAccelStepper* stepperX,
-                     FastAccelStepper* stepperY_Left,
-                     FastAccelStepper* stepperY_Right,
-                     FastAccelStepper* stepperZ);
+private:
+    FastAccelStepperEngine& _engine; // Reference to the engine
+    FastAccelStepper* _stepperX;
+    FastAccelStepper* _stepperY_Left;
+    FastAccelStepper* _stepperY_Right;
+    FastAccelStepper* _stepperZ;
+    // Note: rotationStepper is accessed via the extern declaration from Rotation_Motor.h
 
-// Main homing function
-bool homeAllAxes();
+    Bounce _xHomeSwitch;
+    Bounce _yLeftHomeSwitch;
+    Bounce _yRightHomeSwitch;
+    Bounce _zHomeSwitch;
 
-// Utility functions
-long inchesToStepsXYZ(float inches);
+    bool _isHoming = false; // Internal homing state flag
+
+    long inchesToStepsXYZ(float inches); // Keep utility function private or move elsewhere if shared
+};
 
 #endif // HOMING_H 
