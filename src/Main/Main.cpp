@@ -5,7 +5,7 @@
 #include <ArduinoOTA.h>
 #include <WebSocketsServer.h>
 #include "system/StateMachine.h"  // Now in include directory!
-#include "motors/ServoMotor.h"
+#include "motors/servo_motor.h"
 #include "storage/persistence.h"
 #include "storage/painting_settings.h"
 
@@ -22,7 +22,7 @@ unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 10;
 const int servoPin = 4;
 
-ServoMotor myServo(servoPin);
+// Removed ServoMotor class - using function-based approach
 // Removed extern PaintingSettings - using function-based approach
 
 // Define the global flag previously in machine_state.cpp
@@ -48,7 +48,7 @@ void setup() {
   
   // Initialize servo after settings are loaded
   int initialServoAngle = getServoAngleSide1(); // Get initial angle from loaded settings
-  myServo.init(initialServoAngle);
+  initServoMotor(servoPin, initialServoAngle);
   Serial.printf("Servo Initialized at: %d degrees\n", initialServoAngle);
 
   // Any setup code that *must* run after initializeSystem()

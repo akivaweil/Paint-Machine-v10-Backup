@@ -4,13 +4,13 @@
 #include "utils/settings.h" // Include for PNP_CYCLE_SENSOR_PIN
 #include "system/StateMachine.h" // Include for state machine access
 #include "states/PnPState.h" // Include the new PnPState
-#include "motors/ServoMotor.h" // Include for servo control
+#include "motors/servo_motor.h" // Include for servo control
 #include "system/GlobalState.h" // Include for isPaused global variable
 // GlobalDebouncers.h is already included via IdleState.h
 
 // Reference to the global state machine instance
 extern StateMachine* stateMachine;
-extern ServoMotor myServo; // Declare myServo as extern
+// Removed extern ServoMotor - using function-based approach
 
 //* ************************************************************************
 //* ***************************** IDLE STATE ******************************
@@ -50,7 +50,7 @@ void IdleState::enter() {
     Serial.println("PNP Cycle Sensor debouncer is global and initialized in Setup.");
 
     // Set servo to 180 degrees
-    myServo.setAngle(180);
+    setServoAngle(180);
     Serial.println("Servo set to 180 degrees in Idle State.");
 
     Serial.println("Idle state active. Press PnP cycle sensor to enter PnP mode."); 

@@ -1,7 +1,7 @@
 #include "functionality/ManualControl.h"
 #include <Arduino.h>
 #include "motors/XYZ_Movements.h"
-#include "motors/ServoMotor.h"
+#include "motors/servo_motor.h"
 #include "system/StateMachine.h"
 #include "states/State.h" // Required for state->getName()
 #include <FastAccelStepper.h> // Required for stepper->getCurrentPosition()
@@ -10,7 +10,7 @@
 #include <limits.h> // For LONG_MIN, INT_MIN
 
 // External instances from the main project
-extern ServoMotor myServo;
+// Removed extern ServoMotor - using function-based approach
 extern FastAccelStepper* stepperX;
 extern FastAccelStepper* stepperY_Left; // Assuming Y_Left is representative for Y position
 extern FastAccelStepper* stepperZ;
@@ -79,7 +79,7 @@ void handleManualMoveToPosition(long targetX_steps, long targetY_steps, long tar
         Serial.println(" (provided)");
 
         //! Set Servo Angle if provided
-        myServo.setAngle(actual_targetAngle_deg);
+        setServoAngle(actual_targetAngle_deg);
         Serial.print("Servo set to ");
         Serial.print(actual_targetAngle_deg);
         Serial.println(" degrees");

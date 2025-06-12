@@ -7,7 +7,7 @@
 #include "../../include/settings/painting.h"
 #include "storage/painting_settings.h"
 #include <FastAccelStepper.h>
-#include "../../include/motors/ServoMotor.h"
+#include "motors/servo_motor.h"
 #include "../../include/web/Web_Dashboard_Commands.h"
 #include "../../include/system/StateMachine.h"
 #include <WebSocketsServer.h>     // For webSocket.loop()
@@ -17,7 +17,7 @@ extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
 extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
-extern ServoMotor myServo;
+// Removed extern ServoMotor - using function-based approach
 // Removed extern PaintingSettings - using function-based approach
 // Function-based StateMachine - no extern needed
 extern WebSocketsServer webSocket;    // For immediate command processing
@@ -94,7 +94,7 @@ void paintSide2Pattern() {
     long paintOffsetSteps = (long)(0.25f * STEPS_PER_INCH_XYZ); // 0.25 inches in steps
 
     //! Set Servo Angle FIRST
-    myServo.setAngle(servoAngle);
+    setServoAngle(servoAngle);
     Serial.println("Servo set to: " + String(servoAngle) + " degrees for Side 2");
 
     //! STEP 0: Turn on pressure pot
@@ -290,7 +290,7 @@ void paintSide2Pattern() {
     }
 
     //! Set Servo Angle and Z height for final X pass
-    myServo.setAngle(85);
+    setServoAngle(85);
     Serial.println("Servo set to: 85 degrees for final X pass on Side 2");
     long finalXPassZPos_Side2 = (long)(-1.75 * STEPS_PER_INCH_XYZ);
     Serial.printf("Side 2 Pattern: Setting Z to %.2f inches for final X pass\n", -1.75);

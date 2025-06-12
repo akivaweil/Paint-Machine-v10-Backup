@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "motors/PaintingSides.h"
 #include "../../include/web/Web_Dashboard_Commands.h"
-#include "motors/ServoMotor.h"
+#include "motors/servo_motor.h"
 #include "hardware/paintGun_Functions.h"
 #include "hardware/pressurePot_Functions.h"
 #include "motors/XYZ_Movements.h"
@@ -13,7 +13,7 @@
 #include "system/GlobalState.h"    // For isPaused
 #include <WebSocketsServer.h>     // For webSocket.loop()
 
-extern ServoMotor myServo;
+// Removed extern ServoMotor - using function-based approach
 extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
 extern FastAccelStepper *stepperY_Right;
@@ -91,7 +91,7 @@ bool checkForImmediateCommands() {
 
 // Helper function to prepare for the next painting sequence
 void _prepareForPaintingSequence() {
-    myServo.setAngle(0);
+    setServoAngle(0);
     Serial.println("Reset servo angle to 0 degrees before painting sequence");
     
     paintGun_OFF();
@@ -230,7 +230,7 @@ void paintAllSides() {
         //! INTER-COAT DELAY AND LOADING BAR
         //! ************************************************************************
         Serial.println("Setting servo to 180 degrees for inter-coat movement.");
-        myServo.setAngle(180);
+        setServoAngle(180);
         Serial.println("Servo set to 180 degrees during inter-coat delay.");
         
         Serial.println("Preparing for inter-coat delay: Moving X to loading bar start position.");

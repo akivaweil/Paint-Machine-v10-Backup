@@ -6,7 +6,7 @@
 #include "motors/stepper_globals.h" 
 #include "hardware/cylinder_Functions.h"
 #include "hardware/vacuum_Functions.h"
-#include "motors/ServoMotor.h"
+#include "motors/servo_motor.h"
 #include "system/StateMachine.h"
 // #include "persistence/PnPData.h" // File does not exist
 #include "states/IdleState.h" // Include IdleState for transition
@@ -36,7 +36,7 @@ extern float g_pnp_y_speed;
 extern float g_pnp_y_accel;
 
 // External references
-extern ServoMotor myServo;
+// Removed extern ServoMotor - using function-based approach
 extern StateMachine *stateMachine;
 // Removed extern PaintingSettings - using function-based approach
 extern volatile bool homeCommandReceived;

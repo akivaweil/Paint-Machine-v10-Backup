@@ -7,7 +7,7 @@
 #include "../../include/settings/painting.h"         // For painting-specific constants (SIDE3_Z_HEIGHT etc.)
 #include "storage/painting_settings.h" // Function-based painting settings
 #include <FastAccelStepper.h>
-#include "../../include/motors/ServoMotor.h"         // For ServoMotor class
+#include "motors/servo_motor.h"         // For ServoMotor class
 #include "../../include/web/Web_Dashboard_Commands.h" // For checkForHomeCommand
 #include "../../include/system/StateMachine.h" // Include StateMachine header
 #include <WebSocketsServer.h>     // For webSocket.loop()
@@ -17,7 +17,7 @@ extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left;
 extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
-extern ServoMotor myServo;
+// Removed extern ServoMotor - using function-based approach
 // Removed extern PaintingSettings - using function-based approach
 // Function-based StateMachine - no extern needed
 extern WebSocketsServer webSocket;    // For immediate command processing
@@ -103,7 +103,7 @@ void paintSide3Pattern() {
     int servoAngle = getServoAngleSide3();
 
     //! Set Servo Angle FIRST
-    myServo.setAngle(servoAngle);
+    setServoAngle(servoAngle);
     Serial.println("Servo set to: " + String(servoAngle) + " degrees for Side 3 side");
 
     //! STEP 0: Turn on pressure pot

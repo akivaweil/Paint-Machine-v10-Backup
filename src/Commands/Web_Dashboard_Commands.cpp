@@ -18,7 +18,7 @@
 #include "storage/persistence.h" // Function-based persistence
 #include "storage/painting_settings.h" // Function-based painting settings
 #include "motors/XYZ_Movements.h" // Need for moveToZ
-#include "motors/ServoMotor.h" // Need for servo control
+#include "motors/servo_motor.h" // Need for servo control
 #include "motors/stepper_globals.h" // Need for stepperX, stepperY_Left etc.
 #include "utils/settings.h" // Need for DEFAULT_Z_SPEED
 #include <FastAccelStepper.h> // Include the full library header
@@ -94,7 +94,7 @@ extern bool webSocketServerStarted; // Use global flag from Setup.cpp
 // Using function-based state machine - no extern needed
 
 // Reference to the global servo motor instance
-extern ServoMotor myServo;
+// Removed extern ServoMotor - using function-based approach
 
 // Declarations for functions now that Commands.h is removed
 void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandPayload);
@@ -665,7 +665,7 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         if (isIdleState() || isPnPState()) { 
              if (angle >= 0 && angle <= 180) {
                  Serial.printf("Preview move Servo to: %d\n", angle);
-                 myServo.setAngle(angle);
+                 setServoAngle(angle);
              } else {
                  Serial.println("Invalid servo angle received for preview.");
                  webSocket->broadcastTXT("STATUS:Invalid servo angle received for preview.");

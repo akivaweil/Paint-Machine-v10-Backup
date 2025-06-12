@@ -1,7 +1,7 @@
 #include "states/CleaningState.h"
 #include <Arduino.h>
 #include "motors/XYZ_Movements.h"
-#include "motors/ServoMotor.h"
+#include "motors/servo_motor.h"
 // #include "motors/servo_control.h" // Servo control removed
 #include "utils/settings.h"
 // #include "system/machine_state.h" // No longer needed
@@ -19,7 +19,7 @@ extern void PressurePot_ON();
 extern void PressurePot_OFF();
 
 // External servo instance
-extern ServoMotor myServo;
+// Removed extern ServoMotor - using function-based approach
 
 // Reference to the global state machine instance
 // Function-based StateMachine - no extern needed
@@ -61,7 +61,7 @@ void CleaningState::enter() {
     Serial.println(" mode)");
     
     //! Set Servo to cleaning angle
-    myServo.setAngle(35);
+    setServoAngle(35);
     Serial.println("Servo set to cleaning angle (35 degrees)");
 
     //! Rotate to Side 4 position concurrently with cleaning prep

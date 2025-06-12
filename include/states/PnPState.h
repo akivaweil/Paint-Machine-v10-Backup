@@ -4,7 +4,7 @@
 #include <FastAccelStepper.h>
 #include "states/State.h" // Assuming a base State class exists
 #include "utils/settings.h" // For grid dimensions, pins etc.
-#include "motors/ServoMotor.h" // Added include for ServoMotor
+#include "motors/servo_motor.h" // Added include for ServoMotor
 #include "hardware/GlobalDebouncers.h" // Include for g_pnpCycleSensorDebouncer
 
 // Assuming StateMachine is needed for transitions
