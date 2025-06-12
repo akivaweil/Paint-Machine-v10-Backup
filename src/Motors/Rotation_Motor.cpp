@@ -1,8 +1,11 @@
 #include "motors/Rotation_Motor.h"
 #include "utils/settings.h"
+#include "system/GlobalState.h"
+#include <WebSocketsServer.h>
 
 // Define the global rotation stepper pointer
 FastAccelStepper *rotationStepper = NULL;
+extern WebSocketsServer webSocket;
 
 //* ************************************************************************
 //* ************************* ROTATION MOTOR *************************
@@ -66,6 +69,11 @@ void rotateToAngle(float angle) {
 
     // Wait for rotation to complete
     while (rotationStepper->isRunning()) {
+        //! Handle Pause
+        while (isPaused) {
+            webSocket.loop(); // Keep WebSocket responsive
+            delay(100);       // Small delay to prevent busy-waiting
+        }
         // Yield or delay briefly to allow background tasks and prevent busy-waiting
         delay(10); 
     }

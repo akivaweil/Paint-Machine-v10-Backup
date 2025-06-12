@@ -5,7 +5,7 @@
 #include "system/StateMachine.h" // Needed for state access
 
 // Reference to the global state machine instance
-// Using function-based state machine - no extern needed
+extern StateMachine* stateMachine;
 
 // Function declarations for commands
 void cmdHome();
@@ -280,9 +280,13 @@ void cmdVacuum(bool state) {
 void cmdStatus() {
   Serial.println("Machine Status:");
   
-  const char* stateName = getCurrentStateName();
-  Serial.print("Current State: ");
-  Serial.println(stateName ? stateName : "Unknown (getName failed)");
+  if (stateMachine && stateMachine->getCurrentState()) {
+    const char* stateName = stateMachine->getCurrentState()->getName();
+    Serial.print("Current State: ");
+    Serial.println(stateName ? stateName : "Unknown (getName failed)");
+  } else {
+    Serial.println("Current State: UNKNOWN (StateMachine unavailable)");
+  }
   
   // Display positions (these would need to be implemented elsewhere)
   // and referenced here

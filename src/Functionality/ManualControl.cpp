@@ -1,21 +1,21 @@
 #include "functionality/ManualControl.h"
 #include <Arduino.h>
 #include "motors/XYZ_Movements.h"
-#include "motors/servo_motor.h"
+#include "motors/ServoMotor.h"
 #include "system/StateMachine.h"
-// Removed old State.h include - using function-based StateMachine
+#include "states/State.h" // Required for state->getName()
 #include <FastAccelStepper.h> // Required for stepper->getCurrentPosition()
 #include "motors/Rotation_Motor.h" // ADDED for tray rotation
 #include "settings/motion.h" // ADDED for STEPS_PER_DEGREE
 #include <limits.h> // For LONG_MIN, INT_MIN
 
 // External instances from the main project
-// Removed extern ServoMotor - using function-based approach
+extern ServoMotor myServo;
 extern FastAccelStepper* stepperX;
 extern FastAccelStepper* stepperY_Left; // Assuming Y_Left is representative for Y position
 extern FastAccelStepper* stepperZ;
 extern FastAccelStepper* rotationStepper; // ADDED: extern declaration for rotation stepper
-// Function-based StateMachine - no extern needed
+extern StateMachine* stateMachine;
 // extern const float STEPS_PER_DEGREE; // This is defined in motion.h, included above
 
 // Speed settings for manual movements (can be adjusted or made configurable later)
@@ -35,7 +35,11 @@ const int ANGLE_NOT_PROVIDED = INT_MIN;
 // the machine is in an appropriate state (e.g., Idle).
 
 bool canPerformManualMove() {
-    const char* current_state_name = getCurrentStateName();
+    if (!stateMachine || !stateMachine->getCurrentState()) {
+        Serial.println("Error: StateMachine or current state is null in canPerformManualMove.");
+        return false;
+    }
+    const char* current_state_name = stateMachine->getCurrentState()->getName();
     if (strcmp(current_state_name, "IDLE") == 0) {
         return true;
     }
@@ -79,7 +83,7 @@ void handleManualMoveToPosition(long targetX_steps, long targetY_steps, long tar
         Serial.println(" (provided)");
 
         //! Set Servo Angle if provided
-        setServoAngle(actual_targetAngle_deg);
+        myServo.setAngle(actual_targetAngle_deg);
         Serial.print("Servo set to ");
         Serial.print(actual_targetAngle_deg);
         Serial.println(" degrees");

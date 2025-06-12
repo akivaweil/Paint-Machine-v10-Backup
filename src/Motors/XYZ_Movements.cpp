@@ -1,14 +1,13 @@
 #include "motors/XYZ_Movements.h"
 #include <Arduino.h>
 #include "utils/settings.h" // Likely needed for pin definitions, steps/mm, etc.
-#include "settings/debounce_settings.h" // Added for centralized debounce intervals
-#include "settings/motion.h" // Added for DEFAULT speeds and STEPS_PER_INCH_XYZ
 
 // Include motor control library
 #include <FastAccelStepper.h>
 #include <Bounce2.h>   // For debouncing limit switches
 #include "web/Web_Dashboard_Commands.h" // For checking home commands
-#include <WebSocketsServer.h>     // For webSocket.loop()
+#include "system/GlobalState.h"      // ADDED for isPaused
+#include <WebSocketsServer.h>       // ADDED for webSocket.loop() in pause
 
 // Define stepper engine and steppers (example)
 extern FastAccelStepperEngine engine; // Use the global one from Setup.cpp
@@ -16,12 +15,7 @@ extern FastAccelStepper *stepperX;
 extern FastAccelStepper *stepperY_Left; // Renamed from stepperY
 extern FastAccelStepper *stepperY_Right; // Added second Y motor
 extern FastAccelStepper *stepperZ;
-extern WebSocketsServer webSocket;    // For immediate command processing
-
-// External references to immediate command system
-extern bool immediateCommandPending;
-extern String pendingCommand;
-extern uint8_t pendingCommandClientNum;
+extern WebSocketsServer webSocket; // ADDED: For pause loop
 
 // Switch debouncing objects
 extern Bounce debounceX;
@@ -30,40 +24,6 @@ extern Bounce debounceY_Right; // Added second Y debouncer
 extern Bounce debounceZ;
 
 extern volatile bool homeCommandReceived; // For direct access to the flag
-
-// Function to check for immediate commands during motor movement
-bool checkForImmediateCommandsXYZ() {
-    // Process any pending WebSocket events to catch immediate commands
-    webSocket.loop();
-    
-    // Check for immediate commands
-    if (immediateCommandPending) {
-        Serial.println("*** IMMEDIATE COMMAND DETECTED during XYZ movement - ABORTING NOW! ***");
-        Serial.printf("*** Command: %s, Client: %d ***\n", pendingCommand.c_str(), pendingCommandClientNum);
-        
-        // Stop all motors immediately
-        if (stepperX && stepperX->isRunning()) {
-            Serial.println("*** FORCE STOPPING X MOTOR ***");
-            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-        }
-        if (stepperY_Left && stepperY_Left->isRunning()) {
-            Serial.println("*** FORCE STOPPING Y_LEFT MOTOR ***");
-            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
-        }
-        if (stepperY_Right && stepperY_Right->isRunning()) {
-            Serial.println("*** FORCE STOPPING Y_RIGHT MOTOR ***");
-            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
-        }
-        if (stepperZ && stepperZ->isRunning()) {
-            Serial.println("*** FORCE STOPPING Z MOTOR ***");
-            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
-        }
-        
-        return true; // Immediate command pending
-    }
-    
-    return false; // No immediate commands
-}
 
 //* ************************************************************************
 //* ************************* XYZ MOVEMENTS **************************
@@ -91,16 +51,16 @@ void setupMotors() {
     
     // Setup Bounce2 for debouncing
     debounceX.attach(X_HOME_SWITCH);
-    debounceX.interval(GENERAL_DEBOUNCE_MS); // Changed from DEBOUNCE_INTERVAL
+    debounceX.interval(DEBOUNCE_INTERVAL);
     
     debounceY_Left.attach(Y_LEFT_HOME_SWITCH);
-    debounceY_Left.interval(GENERAL_DEBOUNCE_MS); // Changed from DEBOUNCE_INTERVAL
+    debounceY_Left.interval(DEBOUNCE_INTERVAL);
     
     debounceY_Right.attach(Y_RIGHT_HOME_SWITCH);
-    debounceY_Right.interval(GENERAL_DEBOUNCE_MS); // Changed from DEBOUNCE_INTERVAL
+    debounceY_Right.interval(DEBOUNCE_INTERVAL);
 
     debounceZ.attach(Z_HOME_SWITCH);
-    debounceZ.interval(GENERAL_DEBOUNCE_MS); // Changed from DEBOUNCE_INTERVAL
+    debounceZ.interval(DEBOUNCE_INTERVAL);
 
     Serial.println("Motors and Switches Setup Complete.");
 }
@@ -121,17 +81,19 @@ void moveToXYZ(long x, unsigned int xSpeed, long y, unsigned int ySpeed, long z,
     
     // Wait until all steppers have completed their movements
     while (stepperX->isRunning() || stepperY_Left->isRunning() || stepperY_Right->isRunning() || stepperZ->isRunning()) { // Updated condition
-        // **KEY ENHANCEMENT**: Check for immediate commands during motor movement
-        if (checkForImmediateCommandsXYZ()) {
-            Serial.println("*** XYZ movement ABORTED due to immediate command ***");
-            return; // Exit immediately
+        //! Handle Pause
+        while (isPaused) {
+            webSocket.loop(); // Keep WebSocket responsive
+            // Steppers will hold their position when isPaused is true and this inner loop runs.
+            // No need to stop/restart them unless specific behavior is desired.
+            delay(100);       
         }
-        
+
         // Check for limit switches while running
         checkMotors();
         
-        // Also check for home/pause commands during movement
-        if (checkForPauseCommand()) {
+        // Also check for home command during movement
+        if (checkForHomeCommand()) {
             // Home command received, stop all motors immediately
             Serial.println("HOME command received during movement - aborting movement");
             stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
@@ -141,10 +103,10 @@ void moveToXYZ(long x, unsigned int xSpeed, long y, unsigned int ySpeed, long z,
             break; // Exit the wait loop
         }
         
-        delay(1); // Reduced delay from 5ms to 1ms for more responsive command processing
+        delay(5); // Reduced delay to check more frequently
     }
     
-    if (!homeCommandReceived && !immediateCommandPending) {
+    if (!homeCommandReceived) {
         Serial.printf("Move complete - Position: X:%ld Y_L:%ld Y_R:%ld Z:%ld\n", stepperX->getCurrentPosition(), stepperY_Left->getCurrentPosition(), stepperY_Right->getCurrentPosition(), stepperZ->getCurrentPosition()); // Updated printf
     }
 }
@@ -166,11 +128,17 @@ bool moveToXYZ_HomeCheck(long x, unsigned int xSpeed, long y, unsigned int ySpee
     
     // Wait until all steppers have completed their movements
     while (stepperX->isRunning() || stepperY_Left->isRunning() || stepperY_Right->isRunning() || stepperZ->isRunning()) {
+        //! Handle Pause
+        while (isPaused) {
+            webSocket.loop();
+            delay(100);
+        }
+
         // Check for limit switches while running
         checkMotors();
         
-        // Also check for home/pause commands during movement
-        if (checkForPauseCommand()) {
+        // Also check for home command during movement
+        if (checkForHomeCommand()) {
             // Home command received, stop all motors immediately
             Serial.println("HOME command received during movement - aborting movement");
             stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
@@ -180,7 +148,7 @@ bool moveToXYZ_HomeCheck(long x, unsigned int xSpeed, long y, unsigned int ySpee
             return false; // Movement aborted
         }
         
-        delay(1); // Reduced delay from 5ms to 1ms for more responsive command processing
+        delay(5); // Reduced delay to check more frequently
     }
     
     Serial.printf("Move complete - Position: X:%ld Y_L:%ld Y_R:%ld Z:%ld\n", 
@@ -189,6 +157,90 @@ bool moveToXYZ_HomeCheck(long x, unsigned int xSpeed, long y, unsigned int ySpee
                  stepperY_Right->getCurrentPosition(), 
                  stepperZ->getCurrentPosition());
     return true; // Movement completed successfully
+}
+
+void moveToXYZ_with_X_trigger(long target_x, unsigned int x_speed,
+                              long target_y, unsigned int y_speed,
+                              long target_z, unsigned int z_speed,
+                              long trigger_x_pos, void (*trigger_action)()) {
+    if (!stepperX || !stepperY_Left || !stepperY_Right || !stepperZ) {
+        Serial.println("ERROR: Steppers not initialized in moveToXYZ_with_X_trigger");
+        return;
+    }
+
+    stepperX->setSpeedInHz(x_speed);
+    stepperY_Left->setSpeedInHz(y_speed);
+    stepperY_Right->setSpeedInHz(y_speed); 
+    stepperZ->setSpeedInHz(z_speed);
+    
+    stepperX->moveTo(target_x);
+    stepperY_Left->moveTo(target_y);
+    stepperY_Right->moveTo(target_y);
+    stepperZ->moveTo(target_z);
+    
+    bool action_triggered = false;
+    bool x_move_positive = (target_x > stepperX->getCurrentPosition());
+
+    while ((stepperX && stepperX->isRunning()) ||
+           (stepperY_Left && stepperY_Left->isRunning()) ||
+           (stepperY_Right && stepperY_Right->isRunning()) ||
+           (stepperZ && stepperZ->isRunning())) {
+
+        while (isPaused) {
+            webSocket.loop();
+            delay(100);
+        }
+
+        checkMotors(); 
+
+        if (checkForHomeCommand()) {
+            Serial.println("HOME command received during movement - aborting movement (triggered)");
+            stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+            stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+            stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+            stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+            return; // Abort function
+        }
+
+        if (stepperX && !action_triggered && trigger_action) {
+            if (x_move_positive) {
+                if (stepperX->getCurrentPosition() >= trigger_x_pos) {
+                    trigger_action();
+                    action_triggered = true;
+                    Serial.println("X-trigger action performed (positive move).");
+                }
+            } else {
+                if (stepperX->getCurrentPosition() <= trigger_x_pos) {
+                    trigger_action();
+                    action_triggered = true;
+                    Serial.println("X-trigger action performed (negative move).");
+                }
+            }
+        }
+        delay(1); // Reduced delay for more responsive trigger checking, was 5ms
+    }
+
+    // Final check, in case the loop terminated exactly at the trigger point or trigger was slightly missed by discrete checks
+    // This ensures the action is called if the final position itself qualifies for the trigger.
+    if (stepperX && !action_triggered && trigger_action) {
+        bool condition_met = (x_move_positive && stepperX->getCurrentPosition() >= trigger_x_pos) || 
+                             (!x_move_positive && stepperX->getCurrentPosition() <= trigger_x_pos);
+        // Also ensure we are at or past the trigger relative to the start, not just anywhere if target_x itself is trigger_x_pos and move was tiny
+        // The check above should be sufficient if current position reflects the actual final stop position.
+        if (condition_met) {
+             trigger_action();
+             action_triggered = true;
+             Serial.println("X-trigger action performed (post-loop check).");
+        }
+    }
+
+    if (!homeCommandReceived) { // Check homeCommandReceived as it might be set by checkForHomeCommand
+      Serial.printf("Triggered move complete - Position: X:%ld Y_L:%ld Y_R:%ld Z:%ld\n", 
+                   stepperX->getCurrentPosition(), 
+                   stepperY_Left->getCurrentPosition(), 
+                   stepperY_Right->getCurrentPosition(), 
+                   stepperZ->getCurrentPosition());
+    }
 }
 
 // This function replaces checkSwitches from Functionality.cpp
@@ -230,22 +282,5 @@ void checkMotors() {
         // Take action like stopping Z motor
         // stepperZ->forceStop(); // Example action
     }
-}
-
-//! ************************************************************************
-//! HELPER FUNCTION TO MOVE TO POSITION (1,1,0) BEFORE HOMING
-//! ************************************************************************
-void moveToPositionOneOneBeforeHoming() {
-    Serial.println("Moving to position (1,1,0) before homing...");
-    
-    // Convert inches to steps
-    long xPos = (long)(1.0 * STEPS_PER_INCH_XYZ);
-    long yPos = (long)(1.0 * STEPS_PER_INCH_XYZ);
-    long zPos = 0; // Z position 0 inches (home position)
-    
-    // Move to position (1,1,0)
-    moveToXYZ(xPos, DEFAULT_X_SPEED, yPos, DEFAULT_Y_SPEED, zPos, DEFAULT_Z_SPEED);
-    
-    Serial.println("Reached position (1,1,0). Ready for homing.");
 }
 

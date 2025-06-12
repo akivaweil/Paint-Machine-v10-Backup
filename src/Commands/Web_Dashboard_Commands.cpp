@@ -11,25 +11,23 @@
 #include <SPIFFS.h>
 #include "hardware/paintGun_Functions.h" // Added to access sendWebStatus
 #include "motors/PaintingSides.h" // Add the new header for painting patterns
-// Removed old class-based include - using function-based painting_settings.h instead
+#include "storage/PaintingSettings.h" // Corrected path
 #include "system/StateMachine.h" // Include StateMachine for state transitions
-#include "utils/machine_state.h" // Include for homeCommandReceived
 #include "functionality/ManualControl.h" // ADDED
-#include "storage/persistence.h" // Function-based persistence
-#include "storage/painting_settings.h" // Function-based painting settings
+#include "storage/Persistence.h" // Corrected path (was persistence/persistence.h)
 #include "motors/XYZ_Movements.h" // Need for moveToZ
-#include "motors/servo_motor.h" // Need for servo control
+#include "motors/ServoMotor.h" // Need for servo control
 #include "motors/stepper_globals.h" // Need for stepperX, stepperY_Left etc.
 #include "utils/settings.h" // Need for DEFAULT_Z_SPEED
 #include <FastAccelStepper.h> // Include the full library header
 #include "web/Web_Dashboard_Commands.h" // Corrected Path to header
 #include <ArduinoJson.h>
 #include "config.h" // Assuming this is directly under include/
-// Removed old IdleState.h include - using function-based StateMachine
+#include "states/IdleState.h" // Include IdleState for comparison
 #include "settings/motion.h" // Include for default PNP values
-// Removed old CleaningState.h and InspectTipState.h includes - using function-based StateMachine
+#include "states/CleaningState.h" // Include for setShortMode
 #include <limits.h> // ADDED For LONG_MIN, INT_MIN
-#include "system/GlobalState.h" // ADDED for isPaused and isActivePainting
+#include "system/GlobalState.h" // ADDED for isPaused
 
 // --- PNP Settings Keys for NVS ---
 #define PNP_X_SPEED_KEY "pnpXSpd"
@@ -52,22 +50,22 @@ extern int g_interCoatDelaySeconds; // ADDED: For delay between coats
 //* ************************************************************************
 
 void savePnpSettingsToNVS() {
-    beginPersistenceTransaction(false); // Open NVS for writing
-    savePersistenceFloat(PNP_X_SPEED_KEY, g_pnp_x_speed);
-    savePersistenceFloat(PNP_X_ACCEL_KEY, g_pnp_x_accel);
-    savePersistenceFloat(PNP_Y_SPEED_KEY, g_pnp_y_speed);
-    savePersistenceFloat(PNP_Y_ACCEL_KEY, g_pnp_y_accel);
-    endPersistenceTransaction(); // Close NVS
+    persistence.beginTransaction(false); // Open NVS for writing
+    persistence.saveFloat(PNP_X_SPEED_KEY, g_pnp_x_speed);
+    persistence.saveFloat(PNP_X_ACCEL_KEY, g_pnp_x_accel);
+    persistence.saveFloat(PNP_Y_SPEED_KEY, g_pnp_y_speed);
+    persistence.saveFloat(PNP_Y_ACCEL_KEY, g_pnp_y_accel);
+    persistence.endTransaction(); // Close NVS
     Serial.println("PNP motion settings saved to NVS.");
 }
 
 void loadPnpSettingsFromNVS() {
-    beginPersistenceTransaction(true); // Open NVS for reading
-    g_pnp_x_speed = loadPersistenceFloat(PNP_X_SPEED_KEY, DEFAULT_PNP_X_SPEED);
-    g_pnp_x_accel = loadPersistenceFloat(PNP_X_ACCEL_KEY, DEFAULT_PNP_X_ACCEL);
-    g_pnp_y_speed = loadPersistenceFloat(PNP_Y_SPEED_KEY, DEFAULT_PNP_Y_SPEED);
-    g_pnp_y_accel = loadPersistenceFloat(PNP_Y_ACCEL_KEY, DEFAULT_PNP_Y_ACCEL);
-    endPersistenceTransaction(); // Close NVS
+    persistence.beginTransaction(true); // Open NVS for reading
+    g_pnp_x_speed = persistence.loadFloat(PNP_X_SPEED_KEY, DEFAULT_PNP_X_SPEED);
+    g_pnp_x_accel = persistence.loadFloat(PNP_X_ACCEL_KEY, DEFAULT_PNP_X_ACCEL);
+    g_pnp_y_speed = persistence.loadFloat(PNP_Y_SPEED_KEY, DEFAULT_PNP_Y_SPEED);
+    g_pnp_y_accel = persistence.loadFloat(PNP_Y_ACCEL_KEY, DEFAULT_PNP_Y_ACCEL);
+    persistence.endTransaction(); // Close NVS
     Serial.println("PNP motion settings loaded from NVS.");
     Serial.printf("Loaded PNP Settings: X_Speed=%.0f, X_Accel=%.0f, Y_Speed=%.0f, Y_Accel=%.0f\\n",
                   g_pnp_x_speed, g_pnp_x_accel, g_pnp_y_speed, g_pnp_y_accel);
@@ -90,10 +88,11 @@ extern WebSocketsServer webSocket;
 // bool webSocketServerStarted = false; // MOVED TO SETUP.CPP
 extern bool webSocketServerStarted; // Use global flag from Setup.cpp
 
-// Using function-based state machine - no extern needed
+// Reference to the global state machine instance (assuming it's defined in Setup.cpp or main.cpp)
+extern StateMachine* stateMachine;
 
 // Reference to the global servo motor instance
-// Removed extern ServoMotor - using function-based approach
+extern ServoMotor myServo;
 
 // Declarations for functions now that Commands.h is removed
 void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandPayload);
@@ -181,13 +180,18 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         Serial.printf("[WS] Client #%u connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
         
         // --- Send current state to newly connected client --- 
-        String stateMessage = "STATE:";
-        stateMessage += getCurrentStateName();
-        webSocket.sendTXT(num, stateMessage);
-        Serial.print("Sent current state to client #");
-        Serial.print(num);
-        Serial.print(": ");
-        Serial.println(stateMessage);
+        if (stateMachine && stateMachine->getCurrentState()) {
+            String stateMessage = "STATE:";
+            stateMessage += stateMachine->getCurrentState()->getName();
+            webSocket.sendTXT(num, stateMessage);
+            Serial.print("Sent current state to client #");
+            Serial.print(num);
+            Serial.print(": ");
+            Serial.println(stateMessage);
+        } else {
+            Serial.println("[WS] Could not send initial state: StateMachine or current state is null.");
+            webSocket.sendTXT(num, "STATE:UNKNOWN"); // Send a default
+        }
         // ------------------------------------------------------
       }
       break;
@@ -215,38 +219,6 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     Serial.print(num);
     Serial.print(": ");
     Serial.println(commandPayload);
-    
-    // Add timestamp for debugging command processing timing
-    Serial.print("[DEBUG] Processing command at: ");
-    Serial.println(millis());
-    
-    // Check if this is an immediate command that should interrupt current operations
-    String baseCommand = commandPayload;
-    int baseColonIndex = baseCommand.indexOf(':');
-    if (baseColonIndex != -1) {
-        baseCommand = baseCommand.substring(0, baseColonIndex);
-    }
-    baseCommand.toUpperCase();
-    
-    // If it's an immediate command and we're not already in idle state, flag for immediate processing
-        if (isImmediateCommand(baseCommand) && !isIdleState()) {
-        Serial.print("IMMEDIATE COMMAND DETECTED: ");
-        Serial.println(baseCommand);
-        
-        // Set the immediate command flags
-        immediateCommandPending = true;
-        pendingCommand = commandPayload;
-        pendingCommandClientNum = num;
-        
-        // Also process immediately if it's a critical safety command
-        if (baseCommand == "HOME" || baseCommand == "HOME_ALL" || 
-            baseCommand == "PAUSE" || baseCommand == "PAINT_GUN_OFF") {
-            Serial.println("CRITICAL SAFETY COMMAND - Processing immediately");
-            // Process critical commands immediately for safety
-        }
-        
-        return; // Don't process normally, let main loop handle it
-    }
 
     String commandToProcess = commandPayload; // This will hold the actual command string for colon-parsing
 
@@ -263,30 +235,22 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
 
             // Handle PAUSE/RESUME first if they are sent as JSON commands
             if (json_command_field.equalsIgnoreCase("PAUSE")) {
-                Serial.print("[DEBUG] PAUSE command processing at: ");
-                Serial.println(millis());
                 isPaused = true;
-                Serial.println("[WS] PAUSE command received (JSON). System paused.");
+                Serial.println("[WS] PAUSE command received. System paused.");
                 webSocket->sendTXT(num, "CMD_ACK: System Paused");
                 webSocket->broadcastTXT("STATUS:PAUSED");
-                Serial.print("[DEBUG] PAUSE command completed at: ");
-                Serial.println(millis());
                 return;
             } else if (json_command_field.equalsIgnoreCase("RESUME")) {
-                Serial.print("[DEBUG] RESUME command processing at: ");
-                Serial.println(millis());
-                Serial.print("[WS] RESUME command received (JSON). isPaused was: ");
-                Serial.println(isPaused ? "true" : "false");
                 isPaused = false;
-                Serial.println("[WS] System resumed (JSON). isPaused now: false");
+                Serial.println("[WS] RESUME command received. System resumed.");
                 webSocket->sendTXT(num, "CMD_ACK: System Resumed");
                 webSocket->broadcastTXT("STATUS:RESUMED");
                 // Potentially broadcast current machine state after resuming
-                String stateMessage = "STATE:";
-                stateMessage += getCurrentStateName();
-                webSocket->broadcastTXT(stateMessage);
-                Serial.print("[DEBUG] RESUME command completed at: ");
-                Serial.println(millis());
+                if (stateMachine && stateMachine->getCurrentState()) {
+                    String stateMessage = "STATE:";
+                    stateMessage += stateMachine->getCurrentState()->getName();
+                    webSocket->broadcastTXT(stateMessage);
+                }
                 return;
             }
 
@@ -379,7 +343,7 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
 
     // --- STATE MACHINE CHECK --- 
     // Note: Using baseCommandAction here
-    if (!isIdleState() && 
+    if (stateMachine && stateMachine->getCurrentState() != stateMachine->getIdleState() && 
         (baseCommandAction == "HOME_ALL" || 
          baseCommandAction == "START_PNP" ||
          baseCommandAction == "PAINT_SIDE_1" || 
@@ -397,6 +361,28 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
 
     // --- COMMAND PROCESSING ---
     // Ensure all subsequent checks use 'baseCommandAction'
+
+    // Handle PAUSE/RESUME for non-JSON commands or if JSON parsing failed but command is simple
+    if (baseCommandAction == "PAUSE") {
+        isPaused = true;
+        Serial.println("[WS] PAUSE command received (plain text). System paused.");
+        webSocket->sendTXT(num, "CMD_ACK: System Paused");
+        webSocket->broadcastTXT("STATUS:PAUSED");
+        return;
+    } else if (baseCommandAction == "RESUME") {
+        isPaused = false;
+        Serial.println("[WS] RESUME command received (plain text). System resumed.");
+        webSocket->sendTXT(num, "CMD_ACK: System Resumed");
+        webSocket->broadcastTXT("STATUS:RESUMED");
+        // Potentially broadcast current machine state after resuming
+        if (stateMachine && stateMachine->getCurrentState()) {
+            String stateMessage = "STATE:";
+            stateMessage += stateMachine->getCurrentState()->getName();
+            webSocket->broadcastTXT(stateMessage);
+        }
+        return;
+    }
+
     if (baseCommandAction == "STATUS") {
         // Send back current status (e.g., state, positions)
         // sendWebStatus(webSocket, "STATUS_UPDATE"); // Call with a message or update internal logic
@@ -405,24 +391,32 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     }
     else if (baseCommandAction == "HOME_ALL") {
         // Trigger homing state
-        // Force stop any running motors first
-        if (stepperX->isRunning()) stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-        if (stepperY_Left->isRunning()) stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
-        if (stepperY_Right->isRunning()) stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
-        if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
-        
-        // Set the home command received flag to interrupt any ongoing painting operations
-        homeCommandReceived = true;
-        
-        // Change to homing state immediately
-        changeState(MachineState::HOMING);
-        webSocket->sendTXT(num, "CMD_ACK: Homing sequence initiated.");
+        if (stateMachine) {
+            // Force stop any running motors first
+            if (stepperX->isRunning()) stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+            if (stepperY_Left->isRunning()) stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+            if (stepperY_Right->isRunning()) stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+            if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+            
+            // Set the home command received flag to interrupt any ongoing painting operations
+            homeCommandReceived = true;
+            
+            // Change to homing state immediately
+            stateMachine->changeState(stateMachine->getHomingState());
+            webSocket->sendTXT(num, "CMD_ACK: Homing sequence initiated.");
+        } else {
+             webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
+        }
     }
     else if (baseCommandAction == "START_PNP") { // Changed command name
         // Trigger PnP state via StateMachine - NEW WAY
         Serial.println("Transitioning to PnP State via web command...");
-        changeState(MachineState::PNP);
-        webSocket->sendTXT(num, "CMD_ACK: PnP State initiated.");
+        if (stateMachine) {
+            stateMachine->changeState(stateMachine->getPnpState());
+            webSocket->sendTXT(num, "CMD_ACK: PnP State initiated.");
+        } else {
+            webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
+        }
     }
     else if (baseCommandAction == "PAINT_GUN_ON") {
         // Turn on paint gun
@@ -448,97 +442,53 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         webSocket->sendTXT(num, "PRESSURE_POT_STATUS:OFF"); // Send status back to UI
         Serial.printf("Pressure Pot Pin %d set to LOW\n", PRESSURE_POT_PIN);
     }
-    else if (baseCommandAction == "INSPECT_TIP_ON") {
-        Serial.println("Activating Inspect Tip mode via web command");
-        if (isIdleState()) {
-            changeState(MachineState::INSPECT_TIP);
-            webSocket->sendTXT(num, "CMD_ACK: Inspect Tip mode activated");
-        } else {
-            Serial.println("Inspect Tip command rejected: Machine not in IDLE state");
-            webSocket->sendTXT(num, "CMD_ERROR: Machine must be in IDLE state");
-        }
-    }
-    else if (baseCommandAction == "INSPECT_TIP_OFF") {
-        Serial.println("Deactivating Inspect Tip mode via web command");
-        if (isInspectTipState()) {
-            // Transition back to idle directly
-            changeState(MachineState::IDLE);
-            webSocket->sendTXT(num, "CMD_ACK: Inspect Tip mode deactivated");
-        } else {
-            Serial.println("Inspect Tip OFF command ignored: Not in Inspect Tip state");
-            webSocket->sendTXT(num, "CMD_ACK: Inspect Tip already off");
-        }
-    }
-    else if (baseCommandAction == "INSPECT_TIP_TO_PAINTING") {
-        Serial.println("Transitioning from Inspect Tip to Painting via web command");
-        if (isInspectTipState()) {
-            changeState(MachineState::PAINTING);
-            webSocket->sendTXT(num, "CMD_ACK: Transitioning from Inspect Tip to Painting");
-        } else {
-            Serial.println("Inspect Tip to Painting command ignored: Not in Inspect Tip state");
-            webSocket->sendTXT(num, "CMD_ERROR: Machine must be in Inspect Tip state");
-        }
-    }
-    else if (baseCommandAction == "INSPECT_TIP_TO_PNP") {
-        Serial.println("Transitioning from Inspect Tip to PnP via web command");
-        if (isInspectTipState()) {
-            changeState(MachineState::PNP);
-            webSocket->sendTXT(num, "CMD_ACK: Transitioning from Inspect Tip to PnP");
-        } else {
-            Serial.println("Inspect Tip to PnP command ignored: Not in Inspect Tip state");
-            webSocket->sendTXT(num, "CMD_ERROR: Machine must be in Inspect Tip state");
-        }
-    }
     else if (baseCommandAction == "PAINT_SIDE_1") {
         Serial.println("Painting side 1...");
-        isActivePainting = true;
-        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide1Pattern(); // Call the function directly
-        isActivePainting = false;
-        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 1 completed.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 1 initiated.");
         // Transition to Homing state should be handled by the PaintingState or user interaction
     }
     else if (baseCommandAction == "PAINT_SIDE_2") {
         Serial.println("Painting side 2...");
-        isActivePainting = true;
-        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide2Pattern(); // Call directly
-        isActivePainting = false;
-        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 2 completed.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 2 initiated.");
     }
     else if (baseCommandAction == "PAINT_SIDE_3") {
         Serial.println("Painting side 3...");
-        isActivePainting = true;
-        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide3Pattern(); // Call directly
-        isActivePainting = false;
-        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 3 completed.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 3 initiated.");
     }
     else if (baseCommandAction == "PAINT_SIDE_4") {
         Serial.println("Painting side 4...");
-        isActivePainting = true;
-        webSocket->broadcastTXT("STATE:PAINTING_INDIVIDUAL");
         paintSide4Pattern(); // Call directly
-        isActivePainting = false;
-        webSocket->broadcastTXT("STATE:IDLE");
         
         // Simplified: Assume painting starts, homing is handled by state machine or user
-        webSocket->sendTXT(num, "CMD_ACK: Paint Side 4 completed.");
+        webSocket->sendTXT(num, "CMD_ACK: Paint Side 4 initiated.");
     }
     else if (baseCommandAction == "PAINT_ALL_SIDES") {
         Serial.println("Painting all sides (single coat request)...");
         g_requestedCoats = 1; // Explicitly set 1 coat for this command
-        changeState(MachineState::PAINTING);
-        webSocket->sendTXT(num, "CMD_ACK: Single All Sides paint sequence initiated.");
+        if (stateMachine) {
+            stateMachine->setTransitioningToPaintAllSides(true); // Set the flag
+            if (stateMachine->getCleaningState()) { // Ensure cleaning state exists
+                 static_cast<CleaningState*>(stateMachine->getCleaningState())->setShortMode(true); // Set short mode for initial clean
+            } else {
+                Serial.println("ERROR: WebDashboard - CleaningState not available to set short mode.");
+                // Optionally, handle this error, e.g., don't proceed or log more verbosely
+            }
+            stateMachine->setNextStateOverride(stateMachine->getPaintingState());
+            stateMachine->changeState(stateMachine->getCleaningState()); // Start with cleaning
+            webSocket->sendTXT(num, "CMD_ACK: Single All Sides paint sequence initiated."); // Inform user
+        } else {
+            Serial.println("ERROR: StateMachine pointer null. Cannot start Paint All Sides.");
+            webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available."); // Inform user
+        }
     }
     else if (baseCommandAction.equalsIgnoreCase("PAINT_ALL_SIDES_MULTIPLE") || baseCommandAction.equalsIgnoreCase("PAINT_MULTIPLE_COATS")) { 
         int numCoats = 1;
@@ -579,14 +529,27 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         g_requestedCoats = numCoats;
         g_interCoatDelaySeconds = interCoatDelaySec; 
 
-        if (isIdleState()) {
-            changeState(MachineState::PAINTING);
-            webSocket->sendTXT(num, "CMD_ACK: Multiple All Sides paint sequence initiated (" + String(numCoats) + " coats, " + String(interCoatDelaySec) + "s delay).");
+        if (stateMachine) {
+            // Check if machine is IDLE before starting multi-coat
+            if (stateMachine->getCurrentState() == stateMachine->getIdleState()) {
+                stateMachine->setTransitioningToPaintAllSides(true); // Set the flag
+                if (stateMachine->getCleaningState()) { // Ensure cleaning state exists
+                    static_cast<CleaningState*>(stateMachine->getCleaningState())->setShortMode(true); // Set short mode for initial clean
+                } else {
+                    Serial.println("ERROR: WebDashboard - CleaningState not available to set short mode for multiple coats.");
+                }
+                stateMachine->setNextStateOverride(stateMachine->getPaintingState());
+                stateMachine->changeState(stateMachine->getCleaningState()); // Start with cleaning
+                webSocket->sendTXT(num, "CMD_ACK: Multiple All Sides paint sequence initiated (" + String(numCoats) + " coats, " + String(interCoatDelaySec) + "s delay).");
+            } else {
+                 Serial.print("Command ");
+                 Serial.print(baseCommandAction);
+                 Serial.println(" rejected. Machine must be in IDLE state.");
+                 webSocket->sendTXT(num, "CMD_ERROR: Machine not in IDLE state.");
+            }
         } else {
-            Serial.print("Command ");
-            Serial.print(baseCommandAction);
-            Serial.println(" rejected. Machine must be in IDLE state.");
-            webSocket->sendTXT(num, "CMD_ERROR: Machine not in IDLE state.");
+            Serial.println("ERROR: StateMachine pointer null. Cannot start Paint All Sides Multiple.");
+            webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
         }
     }
     else if (baseCommandAction == "CLEAN_GUN") {
@@ -595,15 +558,23 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         // Set machine state directly
         // extern void setMachineState(int state); // No need to set directly, state machine handles it
         // setMachineState(MACHINE_CLEANING);
-        changeState(MachineState::CLEANING);
-        webSocket->sendTXT(num, "CMD_ACK: Entering Cleaning Mode");
+        if (stateMachine) {
+            stateMachine->changeState(stateMachine->getCleaningState());
+            webSocket->sendTXT(num, "CMD_ACK: Entering Cleaning Mode");
+        } else {
+            webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
+        }
     }
     else if (baseCommandAction == "ENTER_PICKPLACE") {
         // Enter pick and place mode via web command
         // NEW WAY: Transition using StateMachine
         Serial.println("Websocket: ENTER_PICKPLACE command received. Transitioning to PnPState...");
-        changeState(MachineState::PNP);
-        webSocket->sendTXT(num, "CMD_ACK: PnP State initiated.");
+        if (stateMachine) {
+            stateMachine->changeState(stateMachine->getPnpState());
+            webSocket->sendTXT(num, "CMD_ACK: PnP State initiated.");
+        } else {
+            webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
+        }
 
         // Note: The actual PnP cycling will be handled by the PnPState update() method.
     }
@@ -611,43 +582,28 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         // Home all axes
         Serial.println("Homing all axes immediately...");
         
+        // Force stop any running motors first
+        if (stepperX->isRunning()) stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
+        if (stepperY_Left->isRunning()) stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
+        if (stepperY_Right->isRunning()) stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
+        if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
+        
         // Set the home command received flag to interrupt any ongoing painting operations
         homeCommandReceived = true;
         
         // Change to homing state immediately
-        changeState(MachineState::HOMING);
-        webSocket->sendTXT(num, "CMD_ACK: Homing sequence initiated.");
-    }
-    else if (baseCommandAction == "PAUSE") {
-        Serial.print("[DEBUG] PAUSE (plain) command processing at: ");
-        Serial.println(millis());
-        isPaused = true;
-        Serial.println("[WS] PAUSE command received. System paused.");
-        webSocket->sendTXT(num, "CMD_ACK: System Paused");
-        webSocket->broadcastTXT("STATUS:PAUSED");
-        Serial.print("[DEBUG] PAUSE (plain) command completed at: ");
-        Serial.println(millis());
-    }
-    else if (baseCommandAction == "RESUME") {
-        Serial.print("[DEBUG] RESUME (plain) command processing at: ");
-        Serial.println(millis());
-        isPaused = false;
-        Serial.println("[WS] RESUME command received (plain text). System resumed.");
-        webSocket->sendTXT(num, "CMD_ACK: System Resumed");
-        webSocket->broadcastTXT("STATUS:RESUMED");
-        // Potentially broadcast current machine state after resuming
-        String stateMessage = "STATE:";
-        stateMessage += getCurrentStateName();
-        webSocket->broadcastTXT(stateMessage);
-        Serial.print("[DEBUG] RESUME (plain) command completed at: ");
-        Serial.println(millis());
-        return;
+        if (stateMachine) {
+            stateMachine->changeState(stateMachine->getHomingState());
+            webSocket->sendTXT(num, "CMD_ACK: Homing sequence initiated.");
+        } else {
+            webSocket->sendTXT(num, "CMD_ERROR: StateMachine not available.");
+        }
     }
     else if (baseCommandAction == "MOVE_Z_PREVIEW") {
         float z_pos_inch = value1;
         long z_pos_steps = (long)(z_pos_inch * STEPS_PER_INCH_XYZ);
         // Compare with StateMachine state
-        if (isIdleState() || isPnPState()) { 
+        if (stateMachine && (stateMachine->getCurrentState() == stateMachine->getIdleState() || stateMachine->getCurrentState() == stateMachine->getPnpState())) { 
             Serial.printf("Preview move Z to: %.2f inches (%ld steps)\n", z_pos_inch, z_pos_steps);
             // Get current X and Y to maintain position
             long currentX = stepperX->getCurrentPosition();
@@ -661,10 +617,10 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     else if (baseCommandAction == "MOVE_SERVO_PREVIEW") {
         int angle = (int)value1;
         // Compare with StateMachine state
-        if (isIdleState() || isPnPState()) { 
+        if (stateMachine && (stateMachine->getCurrentState() == stateMachine->getIdleState() || stateMachine->getCurrentState() == stateMachine->getPnpState())) { 
              if (angle >= 0 && angle <= 180) {
                  Serial.printf("Preview move Servo to: %d\n", angle);
-                 setServoAngle(angle);
+                 myServo.setAngle(angle);
              } else {
                  Serial.println("Invalid servo angle received for preview.");
                  webSocket->broadcastTXT("STATUS:Invalid servo angle received for preview.");
@@ -684,13 +640,13 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         // persistence.begin(); // REMOVED - Not needed for load operations
         String settingsMsg = "PATTERN_SETTINGS:";
         settingsMsg += "paintSpeed=";
-        settingsMsg += String(loadPersistenceFloat(PAINT_SPEED_KEY, 10.0)); // Default 10.0
+        settingsMsg += String(persistence.loadFloat(PAINT_SPEED_KEY, 10.0)); // Default 10.0
         settingsMsg += ",edgeOffset=";
-        settingsMsg += String(loadPersistenceFloat(EDGE_OFFSET_KEY, 0.5)); // Default 0.5
+        settingsMsg += String(persistence.loadFloat(EDGE_OFFSET_KEY, 0.5)); // Default 0.5
         settingsMsg += ",zClearance=";
-        settingsMsg += String(loadPersistenceFloat(Z_CLEARANCE_KEY, 1.0)); // Default 1.0
+        settingsMsg += String(persistence.loadFloat(Z_CLEARANCE_KEY, 1.0)); // Default 1.0
         settingsMsg += ",xOverlap=";
-        settingsMsg += String(loadPersistenceFloat(X_OVERLAP_KEY, 0.2)); // Default 0.2
+        settingsMsg += String(persistence.loadFloat(X_OVERLAP_KEY, 0.2)); // Default 0.2
         // persistence.end();
         webSocket->broadcastTXT(settingsMsg);
         Serial.println("Sent pattern settings: " + settingsMsg);
@@ -699,78 +655,78 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
         // persistence.begin(); // REMOVED - Not needed for load operations
         String anglesMsg = "SERVO_ANGLES:";
         anglesMsg += "side1="; // Changed from top
-        anglesMsg += String(getSide1RotationAngle()); // NEW WAY
+        anglesMsg += String(paintingSettings.getSide1RotationAngle()); // NEW WAY
         anglesMsg += ",side3="; // Changed from bottom
-        anglesMsg += String(getSide3RotationAngle()); // NEW WAY
+        anglesMsg += String(paintingSettings.getSide3RotationAngle()); // NEW WAY
         anglesMsg += ",side4="; // Changed from left
-        anglesMsg += String(getSide4RotationAngle()); // NEW WAY
+        anglesMsg += String(paintingSettings.getSide4RotationAngle()); // NEW WAY
         anglesMsg += ",side2="; // Changed from right
-        anglesMsg += String(getSide2RotationAngle()); // NEW WAY
+        anglesMsg += String(paintingSettings.getSide2RotationAngle()); // NEW WAY
         // persistence.end(); // Keep open if other operations might follow quickly
         webSocket->broadcastTXT(anglesMsg);
         Serial.println("Sent servo angles: " + anglesMsg);
     }
     else if (baseCommandAction == "SET_PAINT_SPEED") {
-         beginPersistenceTransaction(false);
-         savePersistenceFloat(PAINT_SPEED_KEY, value1);
-         endPersistenceTransaction();
+         persistence.beginTransaction(false);
+         persistence.saveFloat(PAINT_SPEED_KEY, value1);
+         persistence.endTransaction();
          Serial.println("Saved Paint Speed: " + String(value1));
     }
     else if (baseCommandAction == "SET_EDGE_OFFSET") {
-        beginPersistenceTransaction(false);
-        savePersistenceFloat(EDGE_OFFSET_KEY, value1);
-        endPersistenceTransaction();
+        persistence.beginTransaction(false);
+        persistence.saveFloat(EDGE_OFFSET_KEY, value1);
+        persistence.endTransaction();
         Serial.println("Saved Edge Offset: " + String(value1));
     }
     else if (baseCommandAction == "SET_Z_CLEARANCE") {
-        beginPersistenceTransaction(false);
-        savePersistenceFloat(Z_CLEARANCE_KEY, value1);
-        endPersistenceTransaction();
+        persistence.beginTransaction(false);
+        persistence.saveFloat(Z_CLEARANCE_KEY, value1);
+        persistence.endTransaction();
         Serial.println("Saved Z Clearance: " + String(value1));
     }
     else if (baseCommandAction == "SET_X_OVERLAP") {
-        beginPersistenceTransaction(false);
-        savePersistenceFloat(X_OVERLAP_KEY, value1);
-        endPersistenceTransaction();
+        persistence.beginTransaction(false);
+        persistence.saveFloat(X_OVERLAP_KEY, value1);
+        persistence.endTransaction();
         Serial.println("Saved X Overlap: " + String(value1));
     }
     else if (baseCommandAction == "SET_SERVO_ANGLE_SIDE1") {
         int angle = valueStr.toInt();
-        setServoAngleSide1(angle); // Update in memory
-        savePaintingSettings(); // Save all settings
+        paintingSettings.setServoAngleSide1(angle); // Update in memory
+        paintingSettings.saveSettings(); // Save all settings
         Serial.print("Servo Angle Side 1 set to (and saved): "); // Added debug
         Serial.println(angle);
         webSocket->sendTXT(num, "CMD_ACK: Servo Angle Side 1 set and saved");
     }
     else if (baseCommandAction == "SET_SERVO_ANGLE_SIDE2") {
         int angle = valueStr.toInt();
-        setServoAngleSide2(angle); // Update in memory
-        savePaintingSettings(); // Save all settings
+        paintingSettings.setServoAngleSide2(angle); // Update in memory
+        paintingSettings.saveSettings(); // Save all settings
         Serial.print("Servo Angle Side 2 set to (and saved): "); // Added debug
         Serial.println(angle);
         webSocket->sendTXT(num, "CMD_ACK: Servo Angle Side 2 set and saved");
     }
     else if (baseCommandAction == "SET_SERVO_ANGLE_SIDE3") {
         int angle = valueStr.toInt();
-        setServoAngleSide3(angle); // Update in memory
-        savePaintingSettings(); // Save all settings
+        paintingSettings.setServoAngleSide3(angle); // Update in memory
+        paintingSettings.saveSettings(); // Save all settings
         Serial.print("Servo Angle Side 3 set to (and saved): "); // Added debug
         Serial.println(angle);
         webSocket->sendTXT(num, "CMD_ACK: Servo Angle Side 3 set and saved");
     }
     else if (baseCommandAction == "SET_SERVO_ANGLE_SIDE4") {
         int angle = valueStr.toInt();
-        setServoAngleSide4(angle); // Update in memory
-        savePaintingSettings(); // Save all settings
+        paintingSettings.setServoAngleSide4(angle); // Update in memory
+        paintingSettings.saveSettings(); // Save all settings
         Serial.print("Servo Angle Side 4 set to (and saved): "); // Added debug
         Serial.println(angle);
         webSocket->sendTXT(num, "CMD_ACK: Servo Angle Side 4 set and saved");
     }
     else if (baseCommandAction == "SAVE_PAINT_SETTINGS") {
         // Save current settings to NVS
-        beginPersistenceTransaction(false); // Start write transaction
-        savePaintingSettings(); // Save all settings managed by PaintingSettings
-        endPersistenceTransaction(); // End write transaction
+        persistence.beginTransaction(false); // Start write transaction
+        paintingSettings.saveSettings(); // Save all settings managed by PaintingSettings
+        persistence.endTransaction(); // End write transaction
         Serial.println("Painting settings saved to NVS via SAVE_PAINT_SETTINGS command.");
 
         // Send confirmation message to client
@@ -780,428 +736,428 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
     }
     else if (baseCommandAction == "RESET_PAINT_SETTINGS") {
         // Reset painting settings to defaults
-        resetPaintingSettingsToDefaults();
-        savePaintingSettings(); // Save defaults immediately
+        paintingSettings.resetToDefaults();
+        paintingSettings.saveSettings(); // Save defaults immediately
         webSocket->broadcastTXT("Painting settings reset to defaults");
         Serial.println("Painting settings reset to defaults");
     }
     else if (baseCommandAction == "SET_PAINTING_OFFSET_X") { 
         float value = value1;
-        setPaintingOffsetX(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setPaintingOffsetX(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Painting Offset X set to (in memory): ");
-        Serial.println(getPaintingOffsetX(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getPaintingOffsetX(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_PAINTING_OFFSET_Y") { 
         float value = value1;
-        setPaintingOffsetY(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setPaintingOffsetY(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Painting Offset Y set to (in memory): ");
-        Serial.println(getPaintingOffsetY(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getPaintingOffsetY(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE1ZHEIGHT") {
         float value = value1;
-        setSide1ZHeight(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide1ZHeight(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 1 Z Height set to (in memory): ");
-        Serial.println(getSide1ZHeight(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide1ZHeight(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE2ZHEIGHT") {
         float value = value1;
-        setSide2ZHeight(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide2ZHeight(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 2 Z Height set to (in memory): ");
-        Serial.println(getSide2ZHeight(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide2ZHeight(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE3ZHEIGHT") {
         float value = value1;
-        setSide3ZHeight(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide3ZHeight(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 3 Z Height set to (in memory): ");
-        Serial.println(getSide3ZHeight(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide3ZHeight(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE4ZHEIGHT") {
         float value = value1;
-        setSide4ZHeight(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide4ZHeight(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 4 Z Height set to (in memory): ");
-        Serial.println(getSide4ZHeight(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide4ZHeight(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE1SIDEZHEIGHT") {
         float value = value1;
-        setSide1SideZHeight(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide1SideZHeight(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 1 Side Z Height set to (in memory): ");
-        Serial.println(getSide1SideZHeight(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide1SideZHeight(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE2SIDEZHEIGHT") {
         float value = value1;
-        setSide2SideZHeight(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide2SideZHeight(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 2 Side Z Height set to (in memory): ");
-        Serial.println(getSide2SideZHeight(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide2SideZHeight(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE3SIDEZHEIGHT") {
         float value = value1;
-        setSide3SideZHeight(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide3SideZHeight(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 3 Side Z Height set to (in memory): ");
-        Serial.println(getSide3SideZHeight(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide3SideZHeight(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE4SIDEZHEIGHT") {
         float value = value1;
-        setSide4SideZHeight(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide4SideZHeight(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 4 Side Z Height set to (in memory): ");
-        Serial.println(getSide4SideZHeight(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide4SideZHeight(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE1SWEEPY") {
         float value = value1;
-        setSide1SweepY(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide1SweepY(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 1 Sweep Y set to (in memory): ");
-        Serial.println(getSide1SweepY(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide1SweepY(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE1SHIFTX") {
         float value = value1;
-        setSide1ShiftX(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide1ShiftX(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 1 Shift X set to (in memory): ");
-        Serial.println(getSide1ShiftX(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide1ShiftX(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE2SWEEPY") {
         float value = value1;
-        setSide2SweepY(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide2SweepY(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 2 Sweep Y set to (in memory): ");
-        Serial.println(getSide2SweepY(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide2SweepY(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE2SHIFTX") {
         float value = value1;
-        setSide2ShiftX(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide2ShiftX(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 2 Shift X set to (in memory): ");
-        Serial.println(getSide2ShiftX(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide2ShiftX(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE3SWEEPY") {
         float value = value1;
-        setSide3SweepY(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide3SweepY(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 3 Sweep Y set to (in memory): ");
-        Serial.println(getSide3SweepY(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide3SweepY(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE3SHIFTX") {
         float value = value1;
-        setSide3ShiftX(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide3ShiftX(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 3 Shift X set to (in memory): ");
-        Serial.println(getSide3ShiftX(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide3ShiftX(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE4SWEEPY") {
         float value = value1;
-        setSide4SweepY(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide4SweepY(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 4 Sweep Y set to (in memory): ");
-        Serial.println(getSide4SweepY(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide4SweepY(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE4SHIFTX") {
         float value = value1;
-        setSide4ShiftX(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide4ShiftX(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 4 Shift X set to (in memory): ");
-        Serial.println(getSide4ShiftX(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide4ShiftX(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE1_ROTATION") {
         int value = (int)value1;
-        setSide1RotationAngle(value);
+        paintingSettings.setSide1RotationAngle(value);
         Serial.print("Side 1 Rotation Angle set to (in memory): ");
-        Serial.println(getSide1RotationAngle());
-        savePaintingSettings(); // CORRECT - Keep save here for actual rotation setting
+        Serial.println(paintingSettings.getSide1RotationAngle());
+        paintingSettings.saveSettings(); // CORRECT - Keep save here for actual rotation setting
     }
     else if (baseCommandAction == "SET_SIDE2_ROTATION") {
         int value = (int)value1;
-        setSide2RotationAngle(value);
+        paintingSettings.setSide2RotationAngle(value);
         Serial.print("Side 2 Rotation Angle set to (in memory): ");
-        Serial.println(getSide2RotationAngle());
-        savePaintingSettings(); // CORRECT - Keep save here for actual rotation setting
+        Serial.println(paintingSettings.getSide2RotationAngle());
+        paintingSettings.saveSettings(); // CORRECT - Keep save here for actual rotation setting
     }
     else if (baseCommandAction == "SET_SIDE3_ROTATION") {
         int value = (int)value1;
-        setSide3RotationAngle(value);
+        paintingSettings.setSide3RotationAngle(value);
         Serial.print("Side 3 Rotation Angle set to (in memory): ");
-        Serial.println(getSide3RotationAngle());
-        savePaintingSettings(); // CORRECT - Keep save here for actual rotation setting
+        Serial.println(paintingSettings.getSide3RotationAngle());
+        paintingSettings.saveSettings(); // CORRECT - Keep save here for actual rotation setting
     }
     else if (baseCommandAction == "SET_SIDE4_ROTATION") {
         int value = (int)value1;
-        setSide4RotationAngle(value);
+        paintingSettings.setSide4RotationAngle(value);
         Serial.print("Side 4 Rotation Angle set to (in memory): ");
-        Serial.println(getSide4RotationAngle());
-        savePaintingSettings(); // CORRECT - Keep save here for actual rotation setting
+        Serial.println(paintingSettings.getSide4RotationAngle());
+        paintingSettings.saveSettings(); // CORRECT - Keep save here for actual rotation setting
     }
     else if (baseCommandAction == "SET_SIDE1PAINTINGXSPEED") {
         int value = (int)value1;
-        setSide1PaintingXSpeed(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide1PaintingXSpeed(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 1 Painting X Speed set to (in memory): ");
-        Serial.println(getSide1PaintingXSpeed());
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide1PaintingXSpeed());
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE1PAINTINGYSPEED") {
         int value = (int)value1;
-        setSide1PaintingYSpeed(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide1PaintingYSpeed(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 1 Painting Y Speed set to (in memory): ");
-        Serial.println(getSide1PaintingYSpeed());
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide1PaintingYSpeed());
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE2PAINTINGXSPEED") {
         int value = (int)value1;
-        setSide2PaintingXSpeed(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide2PaintingXSpeed(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 2 Painting X Speed set to (in memory): ");
-        Serial.println(getSide2PaintingXSpeed());
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide2PaintingXSpeed());
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE2PAINTINGYSPEED") {
         int value = (int)value1;
-        setSide2PaintingYSpeed(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide2PaintingYSpeed(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 2 Painting Y Speed set to (in memory): ");
-        Serial.println(getSide2PaintingYSpeed());
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide2PaintingYSpeed());
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE3PAINTINGXSPEED") {
         int value = (int)value1;
-        setSide3PaintingXSpeed(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide3PaintingXSpeed(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 3 Painting X Speed set to (in memory): ");
-        Serial.println(getSide3PaintingXSpeed());
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide3PaintingXSpeed());
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE3PAINTINGYSPEED") {
         int value = (int)value1;
-        setSide3PaintingYSpeed(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide3PaintingYSpeed(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 3 Painting Y Speed set to (in memory): ");
-        Serial.println(getSide3PaintingYSpeed());
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide3PaintingYSpeed());
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE4PAINTINGXSPEED") {
         int value = (int)value1;
-        setSide4PaintingXSpeed(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide4PaintingXSpeed(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 4 Painting X Speed set to (in memory): ");
-        Serial.println(getSide4PaintingXSpeed());
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide4PaintingXSpeed());
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE4PAINTINGYSPEED") {
         int value = (int)value1;
-        setSide4PaintingYSpeed(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide4PaintingYSpeed(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 4 Painting Y Speed set to (in memory): ");
-        Serial.println(getSide4PaintingYSpeed());
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide4PaintingYSpeed());
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE1STARTX") {
         float value = value1;
-        setSide1StartX(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide1StartX(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 1 Start X set to (in memory): ");
-        Serial.println(getSide1StartX(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide1StartX(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE1STARTY") {
         float value = value1;
-        setSide1StartY(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide1StartY(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 1 Start Y set to (in memory): ");
-        Serial.println(getSide1StartY(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide1StartY(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE2STARTX") {
         float value = value1;
-        setSide2StartX(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide2StartX(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 2 Start X set to (in memory): ");
-        Serial.println(getSide2StartX(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide2StartX(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE2STARTY") {
         float value = value1;
-        setSide2StartY(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide2StartY(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 2 Start Y set to (in memory): ");
-        Serial.println(getSide2StartY(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide2StartY(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE3STARTX") {
         float value = value1;
-        setSide3StartX(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide3StartX(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 3 Start X set to (in memory): ");
-        Serial.println(getSide3StartX(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide3StartX(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE3STARTY") {
         float value = value1;
-        setSide3StartY(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide3StartY(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 3 Start Y set to (in memory): ");
-        Serial.println(getSide3StartY(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide3StartY(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE4STARTX") {
         float value = value1;
-        setSide4StartX(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide4StartX(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 4 Start X set to (in memory): ");
-        Serial.println(getSide4StartX(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide4StartX(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_SIDE4STARTY") {
         float value = value1;
-        setSide4StartY(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setSide4StartY(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Side 4 Start Y set to (in memory): ");
-        Serial.println(getSide4StartY(), 2);
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getSide4StartY(), 2);
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "SET_POSTPRINTPAUSE") { 
         int value = (int)value1;
-        setPostPrintPause(value);
-        // savePaintingSettings(); // Remove internal save
+        paintingSettings.setPostPrintPause(value);
+        // paintingSettings.saveSettings(); // Remove internal save
         Serial.print("Post-Print Pause set to (in memory): ");
-        Serial.println(getPostPrintPause());
-        savePaintingSettings(); // Save after setting
+        Serial.println(paintingSettings.getPostPrintPause());
+        paintingSettings.saveSettings(); // Save after setting
     }
     else if (baseCommandAction == "GET_PAINT_SETTINGS") {
         // Send all current painting settings to the client
         Serial.println("Sending current painting settings to client");
         
         // Paint Gun Offsets
-        // String message = "SETTING:paintingOffsetX:" + String(getPaintingOffsetX(), 2); // message declared above
-        message = "SETTING:paintingOffsetX:" + String(getPaintingOffsetX(), 2);
+        // String message = "SETTING:paintingOffsetX:" + String(paintingSettings.getPaintingOffsetX(), 2); // message declared above
+        message = "SETTING:paintingOffsetX:" + String(paintingSettings.getPaintingOffsetX(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:paintingOffsetY:" + String(getPaintingOffsetY(), 2);
+        message = "SETTING:paintingOffsetY:" + String(paintingSettings.getPaintingOffsetY(), 2);
         webSocket->broadcastTXT(message);
         
         // Z Heights (Order: 1, 2, 3, 4)
-        message = "SETTING:side1ZHeight:" + String(getSide1ZHeight(), 2);
+        message = "SETTING:side1ZHeight:" + String(paintingSettings.getSide1ZHeight(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side2ZHeight:" + String(getSide2ZHeight(), 2);
+        message = "SETTING:side2ZHeight:" + String(paintingSettings.getSide2ZHeight(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side3ZHeight:" + String(getSide3ZHeight(), 2);
+        message = "SETTING:side3ZHeight:" + String(paintingSettings.getSide3ZHeight(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side4ZHeight:" + String(getSide4ZHeight(), 2);
+        message = "SETTING:side4ZHeight:" + String(paintingSettings.getSide4ZHeight(), 2);
         webSocket->broadcastTXT(message);
         
         // Side Z Heights (Order: 1, 2, 3, 4)
-        message = "SETTING:side1SideZHeight:" + String(getSide1SideZHeight(), 2);
+        message = "SETTING:side1SideZHeight:" + String(paintingSettings.getSide1SideZHeight(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side2SideZHeight:" + String(getSide2SideZHeight(), 2);
+        message = "SETTING:side2SideZHeight:" + String(paintingSettings.getSide2SideZHeight(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side3SideZHeight:" + String(getSide3SideZHeight(), 2);
+        message = "SETTING:side3SideZHeight:" + String(paintingSettings.getSide3SideZHeight(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side4SideZHeight:" + String(getSide4SideZHeight(), 2);
+        message = "SETTING:side4SideZHeight:" + String(paintingSettings.getSide4SideZHeight(), 2);
         webSocket->broadcastTXT(message);
         
         // Rotation Angles (Order: 1, 2, 3, 4)
-        message = "SETTING:side1RotationAngle:" + String(getSide1RotationAngle());
+        message = "SETTING:side1RotationAngle:" + String(paintingSettings.getSide1RotationAngle());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side2RotationAngle:" + String(getSide2RotationAngle());
+        message = "SETTING:side2RotationAngle:" + String(paintingSettings.getSide2RotationAngle());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side3RotationAngle:" + String(getSide3RotationAngle());
+        message = "SETTING:side3RotationAngle:" + String(paintingSettings.getSide3RotationAngle());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side4RotationAngle:" + String(getSide4RotationAngle());
+        message = "SETTING:side4RotationAngle:" + String(paintingSettings.getSide4RotationAngle());
         webSocket->broadcastTXT(message);
         
         // Painting Speeds (Order: 1, 2, 3, 4)
-        message = "SETTING:side1PaintingXSpeed:" + String(getSide1PaintingXSpeed());
+        message = "SETTING:side1PaintingXSpeed:" + String(paintingSettings.getSide1PaintingXSpeed());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side1PaintingYSpeed:" + String(getSide1PaintingYSpeed());
+        message = "SETTING:side1PaintingYSpeed:" + String(paintingSettings.getSide1PaintingYSpeed());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side2PaintingXSpeed:" + String(getSide2PaintingXSpeed());
+        message = "SETTING:side2PaintingXSpeed:" + String(paintingSettings.getSide2PaintingXSpeed());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side2PaintingYSpeed:" + String(getSide2PaintingYSpeed());
+        message = "SETTING:side2PaintingYSpeed:" + String(paintingSettings.getSide2PaintingYSpeed());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side3PaintingXSpeed:" + String(getSide3PaintingXSpeed());
+        message = "SETTING:side3PaintingXSpeed:" + String(paintingSettings.getSide3PaintingXSpeed());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side3PaintingYSpeed:" + String(getSide3PaintingYSpeed());
+        message = "SETTING:side3PaintingYSpeed:" + String(paintingSettings.getSide3PaintingYSpeed());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side4PaintingXSpeed:" + String(getSide4PaintingXSpeed());
+        message = "SETTING:side4PaintingXSpeed:" + String(paintingSettings.getSide4PaintingXSpeed());
         webSocket->broadcastTXT(message);
-        message = "SETTING:side4PaintingYSpeed:" + String(getSide4PaintingYSpeed());
+        message = "SETTING:side4PaintingYSpeed:" + String(paintingSettings.getSide4PaintingYSpeed());
         webSocket->broadcastTXT(message);
         
         // Pattern Start Positions (Order: 1, 2, 3, 4)
-        message = "SETTING:side1StartX:" + String(getSide1StartX(), 2);
+        message = "SETTING:side1StartX:" + String(paintingSettings.getSide1StartX(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side1StartY:" + String(getSide1StartY(), 2);
+        message = "SETTING:side1StartY:" + String(paintingSettings.getSide1StartY(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side2StartX:" + String(getSide2StartX(), 2);
+        message = "SETTING:side2StartX:" + String(paintingSettings.getSide2StartX(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side2StartY:" + String(getSide2StartY(), 2);
+        message = "SETTING:side2StartY:" + String(paintingSettings.getSide2StartY(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side3StartX:" + String(getSide3StartX(), 2);
+        message = "SETTING:side3StartX:" + String(paintingSettings.getSide3StartX(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side3StartY:" + String(getSide3StartY(), 2);
+        message = "SETTING:side3StartY:" + String(paintingSettings.getSide3StartY(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side4StartX:" + String(getSide4StartX(), 2);
+        message = "SETTING:side4StartX:" + String(paintingSettings.getSide4StartX(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side4StartY:" + String(getSide4StartY(), 2);
+        message = "SETTING:side4StartY:" + String(paintingSettings.getSide4StartY(), 2);
         webSocket->broadcastTXT(message);
         
         // Pattern Dimensions (Order: 1, 2, 3, 4)
-        message = "SETTING:side1SweepY:" + String(getSide1SweepY(), 2);
+        message = "SETTING:side1SweepY:" + String(paintingSettings.getSide1SweepY(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side1ShiftX:" + String(getSide1ShiftX(), 2);
+        message = "SETTING:side1ShiftX:" + String(paintingSettings.getSide1ShiftX(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side2SweepY:" + String(getSide2SweepY(), 2);
+        message = "SETTING:side2SweepY:" + String(paintingSettings.getSide2SweepY(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side2ShiftX:" + String(getSide2ShiftX(), 2);
+        message = "SETTING:side2ShiftX:" + String(paintingSettings.getSide2ShiftX(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side3SweepY:" + String(getSide3SweepY(), 2);
+        message = "SETTING:side3SweepY:" + String(paintingSettings.getSide3SweepY(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side3ShiftX:" + String(getSide3ShiftX(), 2);
+        message = "SETTING:side3ShiftX:" + String(paintingSettings.getSide3ShiftX(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side4SweepY:" + String(getSide4SweepY(), 2);
+        message = "SETTING:side4SweepY:" + String(paintingSettings.getSide4SweepY(), 2);
         webSocket->broadcastTXT(message);
-        message = "SETTING:side4ShiftX:" + String(getSide4ShiftX(), 2);
+        message = "SETTING:side4ShiftX:" + String(paintingSettings.getSide4ShiftX(), 2);
         webSocket->broadcastTXT(message);
         
         // Post-Print Pause
-        message = "SETTING:postPrintPause:" + String(getPostPrintPause());
+        message = "SETTING:postPrintPause:" + String(paintingSettings.getPostPrintPause());
         webSocket->broadcastTXT(message);
         
         // Servo Angles (Order: 1, 2, 3, 4)
         // NOTE: Originally read directly from NVS using old keys. Changed to use getters 
         // from the paintingSettings object to ensure consistency and fix persistence issue.
-        message = "SETTING:servoAngleSide1:" + String(getServoAngleSide1()); // Use getter
+        message = "SETTING:servoAngleSide1:" + String(paintingSettings.getServoAngleSide1()); // Use getter
         webSocket->broadcastTXT(message);
-        message = "SETTING:servoAngleSide2:" + String(getServoAngleSide2()); // Use getter
+        message = "SETTING:servoAngleSide2:" + String(paintingSettings.getServoAngleSide2()); // Use getter
         webSocket->broadcastTXT(message);
-        message = "SETTING:servoAngleSide3:" + String(getServoAngleSide3()); // Use getter
+        message = "SETTING:servoAngleSide3:" + String(paintingSettings.getServoAngleSide3()); // Use getter
         webSocket->broadcastTXT(message);
-        message = "SETTING:servoAngleSide4:" + String(getServoAngleSide4()); // Use getter
+        message = "SETTING:servoAngleSide4:" + String(paintingSettings.getServoAngleSide4()); // Use getter
         webSocket->broadcastTXT(message);
     }
     else if (baseCommandAction == "GOTO_PNP_PICK_LOCATION") {
@@ -1316,24 +1272,13 @@ void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandP
 void processWebSocketEvents() {
   // Process WebSocket events to allow receiving commands
   // This is called during operations that need to be interruptible
+  webSocket.loop();
   
-  // Process WebSocket events multiple times to catch up with any backlog
-  for (int i = 0; i < 20; i++) {
+  // Give some time for any WebSocket messages to be processed
+  // This ensures the webSocketEvent handler can set flags like homeCommandReceived
+  for (int i = 0; i < 10; i++) {
     webSocket.loop();
     delay(1);
-  }
-}
-
-// Enhanced function for processing WebSocket events during critical operations
-// This function processes WebSocket events more aggressively and should be called
-// frequently during long-running operations to ensure immediate command processing
-void processWebSocketEventsFrequently() {
-  // Process WebSocket events more aggressively
-  for (int i = 0; i < 50; i++) {
-    webSocket.loop();
-    if (i % 10 == 0) {
-      delay(1); // Small delay every 10 iterations
-    }
   }
 }
 
@@ -1346,8 +1291,8 @@ extern FastAccelStepper *stepperY_Right;
 extern FastAccelStepper *stepperZ;
 
 bool checkForHomeCommand() {
-  // Process any pending WebSocket events using enhanced processing
-  processWebSocketEventsFrequently();
+  // Process any pending WebSocket events
+  processWebSocketEvents();
   
   // Check if a home command was received
   if (homeCommandReceived) {
@@ -1359,55 +1304,16 @@ bool checkForHomeCommand() {
     if (stepperY_Right->isRunning()) stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
     if (stepperZ->isRunning()) stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
     
-    // Immediately change to homing state
-    Serial.println("Changing to homing state immediately due to HOME command");
-    changeState(MachineState::HOMING);
+    // If we have a state machine, immediately change to homing state
+    if (stateMachine) {
+      Serial.println("Changing to homing state immediately due to HOME command");
+      stateMachine->changeState(stateMachine->getHomingState());
+    }
     
     return true;
   }
   
   return false;
-}
-
-// Function to check for PAUSE command during painting operations
-// Returns true if the operation was aborted due to home command while paused
-bool checkForPauseCommand() {
-  static unsigned long lastCheckTime = 0;
-  unsigned long currentTime = millis();
-
-  // Log that the function is being called, but not too frequently to avoid spamming the serial monitor.
-  if (currentTime - lastCheckTime > 500) { // Log every 500ms
-    Serial.print("[DEBUG] checkForPauseCommand called. isPaused = ");
-    Serial.println(isPaused ? "true" : "false");
-    lastCheckTime = currentTime;
-  }
-
-  // Process any pending WebSocket events first using the enhanced function
-  processWebSocketEventsFrequently();
-  
-  // If paused, wait in a loop until unpaused or home command received
-  if (isPaused) { 
-    Serial.println("[DEBUG] PAUSED DETECTED. Entering wait loop.");
-    while (isPaused) {
-      // Continue processing WebSocket events while paused (more frequently)
-      processWebSocketEventsFrequently();
-      
-      // Check for home command while paused
-      if (homeCommandReceived) {
-        Serial.println("HOME command received while paused - aborting operation");
-        isPaused = false; // Clear pause state since we're aborting
-        return true; // Indicate that operation was aborted
-      }
-      
-      // Small delay to prevent this loop from consuming all CPU
-      delay(50); 
-      Serial.print("."); // Print a dot to show we are in the pause loop
-    }
-    Serial.println("\n[DEBUG] RESUMED. Exiting wait loop.");
-  }
-  
-  // Final check for home command even if not paused
-  return homeCommandReceived;
 }
 
 // Function to check and restart WebSocket if needed
@@ -1468,7 +1374,7 @@ void handleDashboardClient() {
     String currentLine = "";
     String request = ""; // Initialize request string
     unsigned long clientConnectTime = millis(); // Record connection time
-    const unsigned long clientReadTimeout = 20; // 5 seconds timeout for reading request
+    const unsigned long clientReadTimeout = 5000; // 5 seconds timeout for reading request
 
     while (dashboardClient.connected()) {
       if (dashboardClient.available()) {
@@ -1619,21 +1525,12 @@ void runDashboardServer() {
     // Ensure WebSocket is running if WiFi is connected
     ensureWebSocketRunning();
     
-    // **REVOLUTIONARY CHANGE**: Process WebSocket events MULTIPLE times per call
-    // This ensures immediate command processing even during long painting operations
-    for (int i = 0; i < 10; i++) {
-        webSocket.loop();
-    }
-    
     // Handle client requests
     handleDashboardClient();
     
-    // **AGGRESSIVE WebSocket processing** after HTTP handling
-    for (int i = 0; i < 5; i++) {
-        webSocket.loop();
-    }
-    
-    // No delay here - let main loop control timing for maximum responsiveness
+    // Handle WebSocket events
+    webSocket.loop();
+    delay(5); // CHANGED FROM 50. Main loop delay for server tasks
 }
 
 void stopDashboardServer() {
@@ -1693,29 +1590,4 @@ void setupWebDashboardCommands() {
     pinMode(PRESSURE_POT_PIN, OUTPUT);
     digitalWrite(PRESSURE_POT_PIN, LOW); // Ensure pressure pot is off initially
     Serial.printf("Pressure Pot Pin %d initialized as OUTPUT and set to LOW.\n", PRESSURE_POT_PIN);
-}
-
-// External references to global variables
-// Function-based StateMachine - no extern needed
-extern bool isPaused;
-
-// Add global flag for immediate command execution
-extern bool immediateCommandPending;
-extern String pendingCommand;
-extern uint8_t pendingCommandClientNum;
-
-// List of commands that should be executed immediately, interrupting current operations
-const String IMMEDIATE_COMMANDS[] = {
-    "HOME", "HOME_ALL", "PAUSE", "RESUME", "CLEAN_GUN", 
-    "PAINT_GUN_ON", "PAINT_GUN_OFF", "PRESSURE_POT_ON", "PRESSURE_POT_OFF"
-};
-const int NUM_IMMEDIATE_COMMANDS = sizeof(IMMEDIATE_COMMANDS) / sizeof(IMMEDIATE_COMMANDS[0]);
-
-bool isImmediateCommand(const String& command) {
-    for (int i = 0; i < NUM_IMMEDIATE_COMMANDS; i++) {
-        if (command.equalsIgnoreCase(IMMEDIATE_COMMANDS[i])) {
-            return true;
-        }
-    }
-    return false;
 }
