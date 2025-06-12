@@ -5,7 +5,7 @@
 #include "system/StateMachine.h" // Needed for state access
 
 // Reference to the global state machine instance
-extern StateMachine* stateMachine;
+// Using function-based state machine - no extern needed
 
 // Function declarations for commands
 void cmdHome();

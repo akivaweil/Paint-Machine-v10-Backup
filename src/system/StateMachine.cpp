@@ -1,14 +1,5 @@
-#include "system/StateMachine.h"
-#include "states/IdleState.h"
-#include "states/HomingState.h"
-#include "states/PaintingState.h"
-#include "states/CleaningState.h"
-#include "states/PausedState.h"
-#include "states/PnPState.h"
-#include "states/InspectTipState.h"
 #include <Arduino.h>
-#include "system/machine_state.h"
-#include "states/State.h"
+#include "system/StateMachine.h"
 #include <WebSocketsServer.h>
 
 // External references for immediate command system
@@ -19,49 +10,11 @@ extern uint8_t pendingCommandClientNum;
 // Extern declaration for the WebSocket server instance
 extern WebSocketsServer webSocket;
 
-// Flag to prevent circular state changes
-bool inStateTransition = false;
-
-// Global state machine pointer
-StateMachine* stateMachine = nullptr;
-
-StateMachine::StateMachine() : 
-    currentState(nullptr),
-    nextStateOverride(nullptr),
-    _isTransitioningToPaintAllSides(false)
-{
-    // Initialize all state objects
-    idleState = new IdleState();
-    homingState = new HomingState();
-    paintingState = new PaintingState();
-    cleaningState = new CleaningState();
-    pausedState = new PausedState();
-    pnpState = new PnPState();
-    inspectTipState = new InspectTipState();
-    
-    // Set initial state to idle
-    currentState = idleState;
-    currentState->enter();
-    
-    // Set the global pointer
-    stateMachine = this;
-    
-    Serial.println("State Machine initialized with Idle state");
-}
-
-StateMachine::~StateMachine() {
-    // Clean up all state objects
-    delete idleState;
-    delete homingState;
-    delete paintingState;
-    delete cleaningState;
-    delete pausedState;
-    delete pnpState;
-    delete inspectTipState;
-    
-    // Clear the global pointer
-    stateMachine = nullptr;
-}
+// Function-based state machine variables (defined here)
+MachineState currentState = MachineState::IDLE;
+MachineState previousState = MachineState::IDLE;
+PaintingSubState currentPaintingSubState = PaintingSubState::NONE;
+PaintingProgress currentPaintingProgress = PaintingProgress::NONE;
 
 // State timing
 unsigned long stateStartTime = 0;
@@ -319,134 +272,80 @@ void forceToIdleState() {
     stateStartTime = millis();
 }
 
-void StateMachine::changeState(State* newState) {
-    if (newState == nullptr) {
-        Serial.println("ERROR: Attempted to change to NULL state!");
-        return;
-    }
-    
-    const char* newStateName = newState->getName();
-    
-    // Check if already in the target state
-    if (currentState == newState) {
-        Serial.print("INFO: Already in state: ");
-        Serial.println(newStateName);
-        return;
-    }
+//* ************************************************************************
+//* ******************** STATE FUNCTION DECLARATIONS **********************
+//* ************************************************************************
+// These functions would be implemented in their respective state files
+// For now, providing stub implementations to allow compilation
 
-    // Set flag to prevent circular state changes
-    inStateTransition = true;
-    
-    if (currentState != nullptr) {
-        Serial.print("Changing state from ");
-        Serial.print(currentState->getName());
-        Serial.print(" to ");
-        Serial.println(newStateName);
-        currentState->exit();
-    }
-    
-    currentState = newState;
-    currentState->enter();
-
-    // **ENHANCED**: Broadcast state change with better WebSocket handling
-    String stateMessage = "STATE:";
-    stateMessage += newStateName;
-    webSocket.broadcastTXT(stateMessage);
-    Serial.print("Broadcasted state: ");
-    Serial.println(stateMessage);
-    
-    // Clear flag
-    inStateTransition = false;
+void enterIdleState() {
+    Serial.println("Entering IDLE state");
 }
 
-void StateMachine::update() {
-    // **KEY ENHANCEMENT**: Check for immediate commands FIRST
-    if (immediateCommandPending) {
-        Serial.println("*** IMMEDIATE COMMAND DETECTED - Processing immediately ***");
-        
-        // Emergency stop all motors if needed
-        if (pendingCommand.indexOf("HOME") != -1 || pendingCommand.indexOf("CLEAN") != -1) {
-            // Stop motors immediately for safety
-            extern FastAccelStepper *stepperX, *stepperY_Left, *stepperY_Right, *stepperZ;
-            if (stepperX && stepperX->isRunning()) {
-                stepperX->forceStopAndNewPosition(stepperX->getCurrentPosition());
-            }
-            if (stepperY_Left && stepperY_Left->isRunning()) {
-                stepperY_Left->forceStopAndNewPosition(stepperY_Left->getCurrentPosition());
-            }
-            if (stepperY_Right && stepperY_Right->isRunning()) {
-                stepperY_Right->forceStopAndNewPosition(stepperY_Right->getCurrentPosition());
-            }
-            if (stepperZ && stepperZ->isRunning()) {
-                stepperZ->forceStopAndNewPosition(stepperZ->getCurrentPosition());
-            }
-            
-            // Turn off paint gun for safety
-            extern void paintGun_OFF();
-            paintGun_OFF();
-        }
-        
-        // Process the immediate command by calling the processor directly
-        extern void processWebCommand(WebSocketsServer* webSocket, uint8_t num, String commandPayload);
-        processWebCommand(&webSocket, pendingCommandClientNum, pendingCommand);
-        
-        // Clear the immediate command
-        immediateCommandPending = false;
-        pendingCommand = "";
-        pendingCommandClientNum = 0;
-    }
-    
-    // Update current state
-    if (currentState != nullptr) {
-        currentState->update();
-    }
+void updateIdleState() {
+    // Idle state update logic
 }
 
-// --- nextStateOverride Methods ---
-void StateMachine::setNextStateOverride(State* state) {
-    nextStateOverride = state;
-    if (state) {
-        Serial.printf("StateMachine: Next state override set to: %s\n", state->getName());
-    } else {
-        Serial.println("StateMachine: Next state override cleared.");
-    }
+void exitIdleState() {
+    Serial.println("Exiting IDLE state");
 }
 
-State* StateMachine::getNextStateOverrideAndClear() {
-    State* temp = nextStateOverride;
-    if (temp) {
-        Serial.printf("StateMachine: Consuming next state override: %s\n", temp->getName());
-    }
-    nextStateOverride = nullptr;
-    return temp;
+void enterHomingState() {
+    Serial.println("Entering HOMING state");
 }
 
-// --- Paint All Sides Transition Flag Methods ---
-void StateMachine::setTransitioningToPaintAllSides(bool value) {
-    _isTransitioningToPaintAllSides = value;
-    if (value) {
-        Serial.println("StateMachine: Flag set - transitioning to Paint All Sides sequence.");
-    } else {
-        Serial.println("StateMachine: Flag cleared - no longer transitioning to Paint All Sides sequence.");
-    }
+void updateHomingState() {
+    // Homing state update logic
 }
 
-bool StateMachine::isTransitioningToPaintAllSides() const {
-    return _isTransitioningToPaintAllSides;
+void exitHomingState() {
+    Serial.println("Exiting HOMING state");
 }
 
-void StateMachine::clearTransitioningToPaintAllSidesFlag() {
-    if (_isTransitioningToPaintAllSides) {
-        Serial.println("StateMachine: Paint All Sides transition flag explicitly cleared.");
-    }
-    _isTransitioningToPaintAllSides = false;
+void enterPaintingState() {
+    Serial.println("Entering PAINTING state");
 }
 
-// Helper function to get state name
-const char* StateMachine::getStateName(State* state) {
-    if (state != nullptr) {
-        return state->getName();
-    } else {
-        return "Unknown";
-    }
+void updatePaintingState() {
+    // Painting state update logic
+}
+
+void exitPaintingState() {
+    Serial.println("Exiting PAINTING state");
+}
+
+void enterPnPState() {
+    Serial.println("Entering PNP state");
+}
+
+void updatePnPState() {
+    // PnP state update logic
+}
+
+void exitPnPState() {
+    Serial.println("Exiting PNP state");
+}
+
+void enterCleaningState() {
+    Serial.println("Entering CLEANING state");
+}
+
+void updateCleaningState() {
+    // Cleaning state update logic
+}
+
+void exitCleaningState() {
+    Serial.println("Exiting CLEANING state");
+}
+
+void enterInspectTipState() {
+    Serial.println("Entering INSPECT_TIP state");
+}
+
+void updateInspectTipState() {
+    // Inspect tip state update logic
+}
+
+void exitInspectTipState() {
+    Serial.println("Exiting INSPECT_TIP state");
 } 

@@ -12,8 +12,7 @@
 // Include headers for functions called in loop
 #include "web/Web_Dashboard_Commands.h" // For runDashboardServer()
 
-// State machine
-extern StateMachine* stateMachine;
+// Function-based state machine (no class needed)
 
 extern WebSocketsServer webSocket;
 extern bool webSocketServerStarted;
@@ -42,10 +41,9 @@ void processImmediateCommand();
 //* ************************************************************************
 
 void setup() {
-  // Initialize class-based state machine *before* system initialization
-  stateMachine = new StateMachine();
-
+  // Initialize function-based state machine
   initializeSystem();
+  initializeStateMachine();
   setupWebDashboardCommands(); // Initialize pins and settings for web commands
   
   // Initialize servo after settings are loaded
@@ -64,10 +62,8 @@ void loop() {
   // **REVOLUTIONARY CHANGE**: Process WebSocket events MULTIPLE times per loop
   runDashboardServer(); // Now processes WebSocket events 15+ times per call!
   
-  // Update enhanced state machine with immediate command processing
-  if (stateMachine) {
-    stateMachine->update();
-  }
+  // Update function-based state machine with immediate command processing
+  updateStateMachine();
   
   // **ADDITIONAL WebSocket processing** after state update for maximum responsiveness
   webSocket.loop();

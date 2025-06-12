@@ -89,8 +89,7 @@ extern WebSocketsServer webSocket;
 // bool webSocketServerStarted = false; // MOVED TO SETUP.CPP
 extern bool webSocketServerStarted; // Use global flag from Setup.cpp
 
-// Reference to the global state machine instance (assuming it's defined in Setup.cpp or main.cpp)
-extern StateMachine* stateMachine;
+// Using function-based state machine - no extern needed
 
 // Reference to the global servo motor instance
 extern ServoMotor myServo;
