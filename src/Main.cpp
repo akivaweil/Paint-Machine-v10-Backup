@@ -1,6 +1,6 @@
 #include <Arduino.h>
 // #include "Main.h" // REMOVED - File not found
-#include "core/Setup.h"
+#include "Setup.h"
 #include "utils/machine_state.h"
 #include <ArduinoOTA.h>
 #include <WebSocketsServer.h>
@@ -12,8 +12,7 @@
 // Include headers for functions called in loop
 #include "web/Web_Dashboard_Commands.h" // For runDashboardServer()
 
-// State machine
-extern StateMachine* stateMachine;
+// Function-based state machine - no external state machine object needed
 
 extern WebSocketsServer webSocket;
 extern bool webSocketServerStarted;
@@ -42,8 +41,8 @@ void processImmediateCommand();
 //* ************************************************************************
 
 void setup() {
-  // Initialize class-based state machine *before* system initialization
-  stateMachine = new StateMachine();
+  // Initialize function-based state machine *before* system initialization
+  initializeStateMachine();
 
   initializeSystem();
   setupWebDashboardCommands(); // Initialize pins and settings for web commands
@@ -64,10 +63,8 @@ void loop() {
   // **REVOLUTIONARY CHANGE**: Process WebSocket events MULTIPLE times per loop
   runDashboardServer(); // Now processes WebSocket events 15+ times per call!
   
-  // Update enhanced state machine with immediate command processing
-  if (stateMachine) {
-    stateMachine->update();
-  }
+  // Update function-based state machine with immediate command processing
+  updateStateMachine();
   
   // **ADDITIONAL WebSocket processing** after state update for maximum responsiveness
   webSocket.loop();

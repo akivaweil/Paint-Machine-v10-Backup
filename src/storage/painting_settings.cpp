@@ -1,6 +1,6 @@
 #include "storage/painting_settings.h"
 #include "settings/painting.h"
-#include "storage/persistence.h"
+#include "persistence/Persistence.h"
 
 //* ************************************************************************
 //* ************************* PAINTING SETTINGS ****************************

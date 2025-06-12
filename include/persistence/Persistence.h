@@ -51,6 +51,17 @@ public:
 // Global persistence instance
 extern Persistence persistence;
 
+// Function-based persistence wrappers
+void beginPersistenceTransaction(bool readOnly = true);
+void endPersistenceTransaction();
+bool isPersistenceInitialized();
+void savePersistenceFirstTimeFlag();
+bool isPersistenceKey(const char* key);
+float loadPersistenceFloat(const char* key, float defaultValue);
+int loadPersistenceInt(const char* key, int defaultValue);
+void savePersistenceFloat(const char* key, float value);
+void savePersistenceInt(const char* key, int value);
+
 // Define keys for settings
 const char* const SERVO_ANGLE_SIDE1_KEY = "srvAng1";
 const char* const SERVO_ANGLE_SIDE2_KEY = "srvAng2";
